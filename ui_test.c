@@ -111,6 +111,11 @@ void game_reset(Game *gp);
  * globals
  */
 
+Vector2 window_pos2 =
+{
+  .x = 400,
+  .y = 40,
+};
 
 /* 
  * function bodies
@@ -196,6 +201,23 @@ void ui_spacer(UI_context *ui, f32 size) {
     ui_make_transient_box(ui);
 }
 
+UI_box* ui_button(UI_context *ui, Str8 label) {
+  UI_box *box = ui_make_box_from_str(ui, label);
+  UI_signal sig = ui_signal_from_box(ui, box);
+
+  Color background_color = box->background_color;
+
+  if(sig.flags & UI_SIGNAL_FLAG_MOUSE_HOVERING) {
+    box->background_color = ColorBrightness(background_color, 0.12f);
+  }
+
+  if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
+    box->background_color = ColorBrightness(background_color, -0.17f);
+  }
+
+  return box;
+}
+
 void game_update_and_draw(Game *gp) {
 
   gp->dt = GetFrameTime();
@@ -252,27 +274,22 @@ void game_update_and_draw(Game *gp) {
 #endif
 
 #if 1
-    Vector2 window_pos2 =
-    {
-      .x = 400,
-      .y = 40,
-    };
     ui_child_layout_axis(1)
       ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
-      ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
+      ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250}))
       ui_border_color(RED) ui_border_size(2.0f)
       ui_flags(UI_BOX_FLAG_IS_FLOATING | UI_BOX_FLAG_DRAW_BORDER | UI_BOX_FLAG_CLIP | 0) ui_floating_position(window_pos2)
       {
         UI_box *container2 = ui_make_box_from_str(ui, str8_lit("##container2"));
 
         UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.7, };
-        UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.4f, .strictness = 0.7, };
+        UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.2f, .strictness = 0.7, };
         //UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT };
         ui_parent(container2)
           ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
           ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
           ui_semantic_width(child_width) ui_semantic_height(child_height)
-          ui_text_align((UI_text_align){ UI_TEXT_ALIGN_CENTER })
+          ui_text_align(UI_TEXT_ALIGN_CENTER)
           ui_corner_radius(0.1f)
           //ui_corner_radius_0(0.8f)
           //ui_corner_radius_3(0.8f)
@@ -282,15 +299,28 @@ void game_update_and_draw(Game *gp) {
           ui_border_size(2.0f)
           {
             f32 spacing = 8;
-            ui_make_box_from_str(ui, str8_lit("hello world##1_0"));
+            ui_semantic_height(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f }))
+              ui_background_color(BLUE) ui_text_color(GOLD) ui_text_align(UI_TEXT_ALIGN_LEFT)
+              {
+                UI_box *drag_bar = ui_button(ui, str8_lit("Drag Me!##drag_bar"));
+                UI_signal sig = ui_signal_from_box(ui, drag_bar);
+
+                if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
+                  window_pos2 = Vector2Add(window_pos2, Vector2Scale(ui->mouse_pos_delta, 1.0f));
+                }
+
+              }
             ui_spacer(ui, spacing);
-            ui_make_box_from_str(ui, str8_lit("my##1_1"));
+
+            ui_button(ui, str8_lit("hello world##1_0"));
             ui_spacer(ui, spacing);
-            ui_make_box_from_str(ui, str8_lit("name##1_2"));
+            ui_button(ui, str8_lit("my##1_1"));
             ui_spacer(ui, spacing);
-            ui_make_box_from_str(ui, str8_lit("is##1_3"));
+            ui_button(ui, str8_lit("name##1_29123891"));
             ui_spacer(ui, spacing);
-            ui_make_box_from_str(ui, str8_lit("joao##1_4"));
+            ui_button(ui, str8_lit("is##1_3"));
+            ui_spacer(ui, spacing);
+            ui_button(ui, str8_lit("joao##1_4"));
           }
 
       }

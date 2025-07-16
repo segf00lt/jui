@@ -9,6 +9,33 @@
 
 #define UI_CONTEXT_FLAGS \
 
+#define UI_MOUSE_BUTTON_ACTIONS \
+  X(LEFT_MOUSE_CLICK) \
+  X(LEFT_MOUSE_PRESS) \
+  X(LEFT_MOUSE_RELEASE) \
+  X(RIGHT_MOUSE_CLICK) \
+  X(RIGHT_MOUSE_PRESS) \
+  X(RIGHT_MOUSE_RELEASE) \
+  X(MIDDLE_MOUSE_CLICK) \
+  X(MIDDLE_MOUSE_PRESS) \
+  X(MIDDLE_MOUSE_RELEASE) \
+
+#define UI_INPUT_FLAGS \
+  UI_MOUSE_BUTTON_ACTIONS \
+  X(MOUSE_SCROLLED) \
+  X(KEYBOARD_PRESSED) \
+
+#define UI_SIGNAL_FLAGS \
+  UI_MOUSE_BUTTON_ACTIONS \
+  \
+  X(LEFT_MOUSE_DRAG) \
+  X(RIGHT_MOUSE_DRAG) \
+  X(MIDDLE_MOUSE_DRAG) \
+  \
+  X(MOUSE_HOVERING) \
+  X(MOUSE_OVER) \
+
+
 #define UI_BOX_FLAGS \
   X(IS_FLOATING) \
   X(DRAW_TEXT) \
@@ -97,8 +124,11 @@ typedef struct UI_box_list UI_box_list;
 typedef struct UI_box_hash_slot UI_box_hash_slot;
 typedef struct UI_key UI_key;
 typedef struct UI_size UI_size;
+typedef struct UI_signal UI_signal;
+typedef u64 UI_input_flag;
 typedef u64 UI_box_flag;
 typedef u64 UI_context_flag;
+typedef u64 UI_signal_flag;
 typedef UI_box* UI_box_ptr;
 
 typedef enum UI_size_kind {
@@ -120,6 +150,13 @@ typedef enum UI_axis {
   UI_AXIS_Y,
   UI_AXIS_COUNT,
 } UI_axis;
+
+typedef enum UI_modifier_keys {
+  UI_MOD_CONTROL = 0,
+  UI_MOD_SHIFT,
+  UI_MOD_SUPER,
+  UI_MOD_COUNT,
+} UI_modifier_keys;
 
 typedef enum UI_box_flag_index {
   UI_BOX_FLAG_INDEX_NONE = -1,
@@ -145,8 +182,36 @@ typedef enum UI_context_flag_index {
 
 STATIC_ASSERT(UI_CONTEXT_FLAG_INDEX_MAX < 64, UI_CONTEXT_FLAG_INDEX_MAX__is_less_than_64);
 
-#define X(f) const UI_context_flag UI_CONTEXT_FLAG_##_f = (1ull<<UI_CONTEXT_FLAG_INDEX_##f);
+#define X(f) const UI_context_flag UI_CONTEXT_FLAG_##f = (1ull<<UI_CONTEXT_FLAG_INDEX_##f);
 UI_CONTEXT_FLAGS
+#undef X
+
+typedef enum UI_signal_flag_index {
+  UI_SIGNAL_FLAG_INDEX_NONE = -1,
+#define X(f) UI_SIGNAL_FLAG_INDEX_##f,
+  UI_SIGNAL_FLAGS
+#undef X
+    UI_SIGNAL_FLAG_INDEX_MAX,
+} UI_signal_flags_index;
+
+STATIC_ASSERT(UI_SIGNAL_FLAG_INDEX_MAX < 64, UI_SIGNAL_FLAG_INDEX_MAX__is_less_than_64);
+
+#define X(f) const UI_signal_flag UI_SIGNAL_FLAG_##f = (1ull<<UI_SIGNAL_FLAG_INDEX_##f);
+UI_SIGNAL_FLAGS
+#undef X
+
+typedef enum UI_input_flag_index {
+  UI_INPUT_FLAG_INDEX_NONE = -1,
+#define X(f) UI_INPUT_FLAG_INDEX_##f,
+  UI_INPUT_FLAGS
+#undef X
+    UI_INPUT_FLAG_INDEX_MAX,
+} UI_input_flags_index;
+
+STATIC_ASSERT(UI_INPUT_FLAG_INDEX_MAX < 64, UI_INPUT_FLAG_INDEX_MAX__is_less_than_64);
+
+#define X(f) const UI_input_flag UI_INPUT_FLAG_##f = (1ull<<UI_INPUT_FLAG_INDEX_##f);
+UI_INPUT_FLAGS
 #undef X
 
 DECL_UI_ARR(UI_box_ptr);
@@ -262,6 +327,13 @@ struct UI_box {
   f32 active_time;
 };
 
+struct UI_signal {
+  UI_signal_flag flags;
+  UI_box *box;
+  f32 scroll[2];
+  u32 modifier_keys; // using the raylib ones for the moment
+};
+
 struct UI_box_node {
   UI_box_node *next;
   UI_box *box;
@@ -289,10 +361,18 @@ struct UI_context {
   UI_box __dummy;
   UI_box *dummy;
   UI_box *root;
+  u64 build_box_count;
+
+  UI_box_hash_slot box_table[MAX_TABLE_SLOTS];
 
   Font fonts[8];
 
-  UI_box_hash_slot box_table[MAX_TABLE_SLOTS];
+  UI_input_flag input_flags;
+  Vector2 mouse_pos;
+  Vector2 mouse_pos_delta;
+  Vector2 scroll_delta;
+  u32 keyboard_key_pressed;
+  b64 received_interaction;
 
 #define X(upper, camel, lower, type, init, stack_size) UI_ARR_PREFIX##type lower##_stack;
   struct {
@@ -317,6 +397,8 @@ b32 ui_key_match(UI_key a, UI_key b);
 UI_box* ui_get_box_from_key(UI_context *ui, UI_key key);
 UI_box* ui_get_box_from_str(UI_context *ui, UI_key key);
 
+UI_signal ui_signal_from_box(UI_context *ui, UI_box *box);
+
 Str8 ui_strip_id_from_text(Str8 text);
 
 UI_box* ui_make_box_from_key(UI_context *ui, UI_key key);
@@ -331,6 +413,7 @@ f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis);
 void ui_begin_build(UI_context *ui);
 void ui_end_build(UI_context *ui);
 void ui_draw(UI_context *ui);
+void ui_get_input(UI_context *ui);
 
 void ui_draw_rectangle_rounded(Rectangle rec, f32 r0, f32 r1, f32 r2, f32 r3, Color color);
 //void ui_draw_rectangle_lines_rounded(Rectangle rec, f32 roundness, int segments, Color color);
@@ -541,6 +624,79 @@ UI_box* ui_make_box_from_strf(UI_context *ui, char *fmt, ...) {
   return box;
 }
 
+UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
+  UI_signal result = {0};
+
+  // TODO box stacking one on top of the other
+
+  Rectangle box_rec =
+  {
+    .x = box->final_rect.min[0],
+    .y = box->final_rect.min[1],
+    .width =  box->final_rect.max[0] - box->final_rect.min[0],
+    .height = box->final_rect.max[1] - box->final_rect.min[1],
+  };
+
+  for(UI_box *parent = box->parent; parent; parent = parent->parent) {
+    if(parent->flags & UI_BOX_FLAG_CLIP) {
+      Rectangle clip_rec =
+      {
+        .x = parent->final_rect.min[0], .y = parent->final_rect.min[1],
+        .width = parent->final_rect.max[0] - parent->final_rect.min[0],
+        .height = parent->final_rect.max[1] - parent->final_rect.min[1],
+      };
+
+      box_rec = GetCollisionRec(box_rec, clip_rec);
+    }
+  }
+
+  b32 mouse_in_bounds = CheckCollisionPointRec(ui->mouse_pos, box_rec);
+
+  if(mouse_in_bounds) {
+    result.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
+
+#define X(action) if(ui->input_flags & UI_INPUT_FLAG_##action) { result.flags |= UI_SIGNAL_FLAG_##action; }
+    UI_MOUSE_BUTTON_ACTIONS;
+#undef X
+
+#define X(button) \
+    if(ui->input_flags & UI_INPUT_FLAG_##button##_MOUSE_PRESS) { \
+      if(ui->mouse_pos_delta.x != 0 && ui->mouse_pos_delta.y != 0) { \
+        result.flags |= UI_SIGNAL_FLAG_##button##_MOUSE_DRAG; \
+      } \
+    }
+    X(LEFT);
+    X(RIGHT);
+    X(MIDDLE);
+#undef X
+
+  }
+
+  return result;
+}
+
+void ui_get_input(UI_context *ui) {
+  ui->mouse_pos = GetMousePosition();
+  ui->mouse_pos_delta = GetMouseDelta();
+  ui->scroll_delta = GetMouseWheelMoveV();
+  ui->keyboard_key_pressed = PeekKeyPressed();
+
+  ui->input_flags =
+    (UI_INPUT_FLAG_LEFT_MOUSE_CLICK & -IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) |
+    (UI_INPUT_FLAG_LEFT_MOUSE_PRESS & -IsMouseButtonDown(MOUSE_LEFT_BUTTON)) |
+    (UI_INPUT_FLAG_LEFT_MOUSE_RELEASE & -IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) |
+    (UI_INPUT_FLAG_RIGHT_MOUSE_CLICK & -IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) |
+    (UI_INPUT_FLAG_RIGHT_MOUSE_PRESS & -IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) |
+    (UI_INPUT_FLAG_RIGHT_MOUSE_RELEASE & -IsMouseButtonReleased(MOUSE_RIGHT_BUTTON)) |
+    (UI_INPUT_FLAG_MIDDLE_MOUSE_CLICK & -IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) |
+    (UI_INPUT_FLAG_MIDDLE_MOUSE_PRESS & -IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) |
+    (UI_INPUT_FLAG_MIDDLE_MOUSE_RELEASE & -IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON)) |
+    ((ui->scroll_delta.x != 0.0f && ui->scroll_delta.y != 0.0f) ? UI_INPUT_FLAG_MOUSE_SCROLLED : 0) |
+    ((ui->keyboard_key_pressed != 0) ? UI_INPUT_FLAG_KEYBOARD_PRESSED : 0) |
+    0;
+
+}
+
 void ui_begin_build(UI_context *ui) {
   arena_clear(ui->build_arena);
 
@@ -558,6 +714,8 @@ void ui_begin_build(UI_context *ui) {
   ui_push_prop(text_align, (UI_text_align){ UI_TEXT_ALIGN_LEFT });
   ui_push_prop(font_size, 10);
   ui_push_prop(font_spacing, 1);
+
+  ui_get_input(ui);
 
 }
 
