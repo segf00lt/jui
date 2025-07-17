@@ -52,6 +52,9 @@
   X(CLIP) \
   X(OVERFLOW_X) \
   X(OVERFLOW_Y) \
+  X(MOUSE_CLICKABLE) \
+  X(KEYBOARD_CLICKABLE) \
+  X(SCROLL) \
 
 
 #define UI_STYLE_PROPERTIES \
@@ -351,7 +354,17 @@ struct UI_box {
 struct UI_signal {
   UI_signal_flag flags;
   UI_box *box;
-  f32 scroll[2];
+  union {
+    struct {
+      f32 scroll_x;
+      f32 scroll_y;
+    };
+    struct {
+      f32 scroll_0;
+      f32 scroll_1;
+    };
+    f32 scroll[2];
+  };
   u32 modifier_keys; // using the raylib ones for the moment
 };
 
@@ -428,9 +441,9 @@ Str8 ui_strip_id_from_text(Str8 text);
 
 Vector2 ui_mouse_drag_delta(UI_context *ui);
 
-UI_box* ui_make_box_from_key(UI_context *ui, UI_key key);
-UI_box* ui_make_box_from_str(UI_context *ui, Str8 str);
-UI_box* ui_make_box_from_strf(UI_context *ui, char *fmt, ...);
+UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key);
+UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str);
+UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...);
 UI_box* ui_make_transient_box(UI_context *ui);
 
 UI_box_node* ui_push_box_node(UI_context *ui);
@@ -450,10 +463,11 @@ UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn);
  */
 
 #define ui_build(ui) defer_loop(ui_begin_build((ui)), ui_end_build((ui)))
-#define ui_push_prop(name, value) arr_push(ui->name##_stack, (value))
-#define ui_pop_prop(name) arr_pop(ui->name##_stack)
-#define ui_clear_prop(name) arr_clear(ui->name##_stack)
+#define ui_push_prop(name, value) (arr_push(ui->name##_stack, (value)))
+#define ui_pop_prop(name) (arr_pop(ui->name##_stack))
+#define ui_clear_prop(name) (arr_clear(ui->name##_stack))
 #define ui_prop(name, value) defer_loop(ui_push_prop(name, (value)), ui_pop_prop(name))
+#define ui_prop_top(name) (arr_last(ui->name##_stack))
 
 #define ui_mouse_button_mask(button) ((UI_mouse_button_mask)(1<<(button)))
 
@@ -570,10 +584,10 @@ force_inline UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn) {
 }
 
 UI_box* ui_make_transient_box(UI_context *ui) {
-  return ui_make_box_from_key(ui, ((UI_key){0}));
+  return ui_make_box_from_key(ui, 0, ((UI_key){0}));
 }
 
-UI_box* ui_make_box_from_key(UI_context *ui, UI_key key) {
+UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key) {
 
 #define X(upper, camel, lower, type, init, stack_size) type cur_##lower = arr_last(ui->lower##_stack);
   UI_PROPERTIES;
@@ -623,6 +637,8 @@ UI_box* ui_make_box_from_key(UI_context *ui, UI_key key) {
   UI_PROPERTIES;
 #undef X
 
+  box->flags |= flags;
+
   return box;
 }
 
@@ -634,10 +650,10 @@ Str8 ui_strip_id_from_text(Str8 text) {
   return text;
 }
 
-UI_box* ui_make_box_from_str(UI_context *ui, Str8 str) {
+UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str) {
   UI_key key = ui_key_from_str(str);
 
-  UI_box *box = ui_make_box_from_key(ui, key);
+  UI_box *box = ui_make_box_from_key(ui, flags, key);
 
   if(box->flags & UI_BOX_FLAG_DRAW_TEXT) {
     box->text = ui_strip_id_from_text(str);
@@ -646,7 +662,7 @@ UI_box* ui_make_box_from_str(UI_context *ui, Str8 str) {
   return box;
 }
 
-UI_box* ui_make_box_from_strf(UI_context *ui, char *fmt, ...) {
+UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...) {
   Arena_scope scope = scope_begin(ui->temp);
 
   va_list args;
@@ -654,7 +670,7 @@ UI_box* ui_make_box_from_strf(UI_context *ui, char *fmt, ...) {
   Str8 str = push_str8fv(ui->temp, fmt, args);
   va_end(args);
 
-  UI_box *box = ui_make_box_from_str(ui, str);
+  UI_box *box = ui_make_box_from_str(ui, flags, str);
 
   scope_end(scope);
 
@@ -698,14 +714,17 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
   for(UI_mouse_button btn = UI_MOUSE_BUTTON_LEFT; btn < UI_MOUSE_BUTTON_COUNT; btn++) {
     b8 btn_on = ui->mouse_buttons_active & ui_mouse_button_mask(btn);
 
-    if(mouse_in_bounds) {
+    if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
+        mouse_in_bounds)
+    {
       sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
       ui->hot_box_key = box->key;
     } else {
       ui->hot_box_key = ui_key_nil();
     }
 
-    if((ui->input_flags & UI_INPUT_FLAG_MOUSE_PRESS) &&
+    if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
+        (ui->input_flags & UI_INPUT_FLAG_MOUSE_PRESS) &&
         btn_on &&
         mouse_in_bounds
       )
@@ -716,7 +735,8 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       ui->mouse_drag_start_pos = ui->mouse_pos;
     }
 
-    if(ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE &&
+    if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
+        (ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE) &&
         btn_on &&
         ui_key_match(ui_active_box_key(ui, btn), box->key) &&
         mouse_in_bounds
@@ -728,7 +748,8 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       ui->active_box_key[btn] = ui_key_nil();
     }
 
-    if(ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE &&
+    if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
+        (ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE) &&
         btn_on &&
         ui_key_match(ui_active_box_key(ui, btn), box->key) &&
         !mouse_in_bounds
@@ -741,8 +762,9 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     }
 
     /* dragging */
-    if((sig.flags & (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn)) ||
-        ui_key_match(ui_active_box_key(ui, btn), box->key)
+    if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
+        ((sig.flags & (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn)) ||
+        ui_key_match(ui_active_box_key(ui, btn), box->key))
       )
     {
       taken = 1;

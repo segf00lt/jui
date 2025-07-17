@@ -205,7 +205,13 @@ void ui_spacer(UI_context *ui, f32 size) {
 }
 
 UI_signal ui_button(UI_context *ui, Str8 label) {
-  UI_box *box = ui_make_box_from_str(ui, label);
+
+  UI_box_flag flags =
+    UI_BOX_FLAG_MOUSE_CLICKABLE |
+    0;
+
+  UI_box *box = ui_make_box_from_str(ui, flags, label);
+
   UI_signal sig = ui_signal_from_box(ui, box);
 
   Color background_color = box->background_color;
@@ -253,7 +259,7 @@ void game_update_and_draw(Game *gp) {
       ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
       ui_child_layout_axis(UI_AXIS_Y)
       {
-        UI_box *container1 = ui_make_box_from_str(ui, str8_lit("##container1"));
+        UI_box *container1 = ui_make_box_from_str(ui, 0, str8_lit("##container1"));
 
         ui_parent(container1)
           ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
@@ -265,11 +271,11 @@ void game_update_and_draw(Game *gp) {
           ui_font_spacing(2.0f)
           ui_border_size(1.0f)
           {
-            ui_make_box_from_str(ui, str8_lit("hello world##0_0"));
-            ui_make_box_from_str(ui, str8_lit("my##0_1"));
-            ui_make_box_from_str(ui, str8_lit("name##0_2"));
-            ui_make_box_from_str(ui, str8_lit("is##0_3"));
-            ui_make_box_from_str(ui, str8_lit("joao##0_4"));
+            ui_make_box_from_str(ui, 0, str8_lit("hello world##0_0"));
+            ui_make_box_from_str(ui, 0, str8_lit("my##0_1"));
+            ui_make_box_from_str(ui, 0, str8_lit("name##0_2"));
+            ui_make_box_from_str(ui, 0, str8_lit("is##0_3"));
+            ui_make_box_from_str(ui, 0, str8_lit("joao##0_4"));
 
           }
 
@@ -283,7 +289,7 @@ void game_update_and_draw(Game *gp) {
       ui_border_color(RED) ui_border_size(2.0f)
       ui_flags(UI_BOX_FLAG_IS_FLOATING | UI_BOX_FLAG_CLIP | 0) ui_floating_position(window_pos2)
       {
-        UI_box *container2 = ui_make_box_from_str(ui, str8_lit("##container2"));
+        UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
 
         UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.7, };
         UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
