@@ -12,6 +12,8 @@
 
 #include "ui.c"
 
+#undef force_inline
+
 /*
  * constants
  */
@@ -116,6 +118,7 @@ Vector2 window_pos2 =
   .x = 400,
   .y = 40,
 };
+Vector2 save_window_pos2;
 
 /* 
  * function bodies
@@ -201,21 +204,21 @@ void ui_spacer(UI_context *ui, f32 size) {
     ui_make_transient_box(ui);
 }
 
-UI_box* ui_button(UI_context *ui, Str8 label) {
+UI_signal ui_button(UI_context *ui, Str8 label) {
   UI_box *box = ui_make_box_from_str(ui, label);
   UI_signal sig = ui_signal_from_box(ui, box);
 
   Color background_color = box->background_color;
 
-  if(sig.flags & UI_SIGNAL_FLAG_MOUSE_HOVERING) {
+  if(ui_key_match(ui_hot_box_key(ui), box->key)) {
     box->background_color = ColorBrightness(background_color, 0.12f);
   }
 
-  if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
+  if(ui_key_match(ui_active_box_key(ui, UI_MOUSE_BUTTON_LEFT), box->key)) {
     box->background_color = ColorBrightness(background_color, -0.17f);
   }
 
-  return box;
+  return sig;
 }
 
 void game_update_and_draw(Game *gp) {
@@ -278,12 +281,12 @@ void game_update_and_draw(Game *gp) {
       ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
       ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250}))
       ui_border_color(RED) ui_border_size(2.0f)
-      ui_flags(UI_BOX_FLAG_IS_FLOATING | UI_BOX_FLAG_DRAW_BORDER | UI_BOX_FLAG_CLIP | 0) ui_floating_position(window_pos2)
+      ui_flags(UI_BOX_FLAG_IS_FLOATING | UI_BOX_FLAG_CLIP | 0) ui_floating_position(window_pos2)
       {
         UI_box *container2 = ui_make_box_from_str(ui, str8_lit("##container2"));
 
         UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.7, };
-        UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.2f, .strictness = 0.7, };
+        UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
         //UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT };
         ui_parent(container2)
           ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
@@ -302,11 +305,14 @@ void game_update_and_draw(Game *gp) {
             ui_semantic_height(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f }))
               ui_background_color(BLUE) ui_text_color(GOLD) ui_text_align(UI_TEXT_ALIGN_LEFT)
               {
-                UI_box *drag_bar = ui_button(ui, str8_lit("Drag Me!##drag_bar"));
-                UI_signal sig = ui_signal_from_box(ui, drag_bar);
+                UI_signal sig = ui_button(ui, str8_lit("Drag Me!##drag_bar"));
+
+                if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
+                  save_window_pos2 = window_pos2;
+                }
 
                 if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
-                  window_pos2 = Vector2Add(window_pos2, Vector2Scale(ui->mouse_pos_delta, 1.0f));
+                  window_pos2 = Vector2Add(save_window_pos2, ui_mouse_drag_delta(ui));
                 }
 
               }
@@ -329,7 +335,11 @@ void game_update_and_draw(Game *gp) {
   }
 
   defer_loop(BeginDrawing(), EndDrawing()) {
-    ClearBackground(BLACK);
+    if(ui->took_input_event) {
+      ClearBackground(ColorBrightness(RED, -0.4));
+    } else {
+      ClearBackground(BLACK);
+    }
 
     ui_draw(ui);
 

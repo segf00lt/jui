@@ -9,19 +9,27 @@
 
 #define UI_CONTEXT_FLAGS \
 
+#define UI_MOUSE_BUTTONS \
+  X(LEFT) \
+  X(RIGHT) \
+  X(MIDDLE) \
+
 #define UI_MOUSE_BUTTON_ACTIONS \
-  X(LEFT_MOUSE_CLICK) \
   X(LEFT_MOUSE_PRESS) \
-  X(LEFT_MOUSE_RELEASE) \
-  X(RIGHT_MOUSE_CLICK) \
   X(RIGHT_MOUSE_PRESS) \
-  X(RIGHT_MOUSE_RELEASE) \
-  X(MIDDLE_MOUSE_CLICK) \
   X(MIDDLE_MOUSE_PRESS) \
+  X(LEFT_MOUSE_RELEASE) \
+  X(RIGHT_MOUSE_RELEASE) \
   X(MIDDLE_MOUSE_RELEASE) \
+  X(LEFT_MOUSE_CLICK) \
+  X(RIGHT_MOUSE_CLICK) \
+  X(MIDDLE_MOUSE_CLICK) \
 
 #define UI_INPUT_FLAGS \
-  UI_MOUSE_BUTTON_ACTIONS \
+  X(MOUSE_PRESS) \
+  X(MOUSE_RELEASE) \
+  X(MOUSE_CLICK) \
+  X(MOUSE_SCROLL) \
   X(MOUSE_SCROLLED) \
   X(KEYBOARD_PRESSED) \
 
@@ -125,7 +133,7 @@ typedef struct UI_box_hash_slot UI_box_hash_slot;
 typedef struct UI_key UI_key;
 typedef struct UI_size UI_size;
 typedef struct UI_signal UI_signal;
-typedef u64 UI_input_flag;
+typedef u32 UI_input_flag;
 typedef u64 UI_box_flag;
 typedef u64 UI_context_flag;
 typedef u64 UI_signal_flag;
@@ -157,6 +165,19 @@ typedef enum UI_modifier_keys {
   UI_MOD_SUPER,
   UI_MOD_COUNT,
 } UI_modifier_keys;
+
+typedef enum UI_mouse_button {
+  UI_MOUSE_BUTTON_INVALID = -1,
+#define X(b) UI_MOUSE_BUTTON_##b,
+  UI_MOUSE_BUTTONS
+#undef X
+    UI_MOUSE_BUTTON_COUNT,
+} UI_mouse_button;
+
+typedef u32 UI_mouse_button_mask;
+#define X(b) const UI_mouse_button_mask UI_MOUSE_BUTTON_MASK_##b = (1u<<UI_MOUSE_BUTTON_##b);
+UI_MOUSE_BUTTONS
+#undef X
 
 typedef enum UI_box_flag_index {
   UI_BOX_FLAG_INDEX_NONE = -1,
@@ -208,7 +229,7 @@ typedef enum UI_input_flag_index {
     UI_INPUT_FLAG_INDEX_MAX,
 } UI_input_flags_index;
 
-STATIC_ASSERT(UI_INPUT_FLAG_INDEX_MAX < 64, UI_INPUT_FLAG_INDEX_MAX__is_less_than_64);
+STATIC_ASSERT(UI_INPUT_FLAG_INDEX_MAX < (sizeof(UI_input_flag)<<3), UI_INPUT_FLAG_INDEX_MAX__is_within_size);
 
 #define X(f) const UI_input_flag UI_INPUT_FLAG_##f = (1ull<<UI_INPUT_FLAG_INDEX_##f);
 UI_INPUT_FLAGS
@@ -368,11 +389,15 @@ struct UI_context {
   Font fonts[8];
 
   UI_input_flag input_flags;
+  UI_mouse_button_mask mouse_buttons_active;
   Vector2 mouse_pos;
-  Vector2 mouse_pos_delta;
+  Vector2 mouse_drag_start_pos;
   Vector2 scroll_delta;
   u32 keyboard_key_pressed;
-  b64 received_interaction;
+  b32 took_input_event;
+
+  UI_key active_box_key[UI_MOUSE_BUTTON_COUNT];
+  UI_key hot_box_key;
 
 #define X(upper, camel, lower, type, init, stack_size) UI_ARR_PREFIX##type lower##_stack;
   struct {
@@ -401,6 +426,8 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box);
 
 Str8 ui_strip_id_from_text(Str8 text);
 
+Vector2 ui_mouse_drag_delta(UI_context *ui);
+
 UI_box* ui_make_box_from_key(UI_context *ui, UI_key key);
 UI_box* ui_make_box_from_str(UI_context *ui, Str8 str);
 UI_box* ui_make_box_from_strf(UI_context *ui, char *fmt, ...);
@@ -415,8 +442,8 @@ void ui_end_build(UI_context *ui);
 void ui_draw(UI_context *ui);
 void ui_get_input(UI_context *ui);
 
-void ui_draw_rectangle_rounded(Rectangle rec, f32 r0, f32 r1, f32 r2, f32 r3, Color color);
-//void ui_draw_rectangle_lines_rounded(Rectangle rec, f32 roundness, int segments, Color color);
+UI_key ui_hot_box_key(UI_context *ui);
+UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn);
 
 /*
  * macros
@@ -427,6 +454,8 @@ void ui_draw_rectangle_rounded(Rectangle rec, f32 r0, f32 r1, f32 r2, f32 r3, Co
 #define ui_pop_prop(name) arr_pop(ui->name##_stack)
 #define ui_clear_prop(name) arr_clear(ui->name##_stack)
 #define ui_prop(name, value) defer_loop(ui_push_prop(name, (value)), ui_pop_prop(name))
+
+#define ui_mouse_button_mask(button) ((UI_mouse_button_mask)(1<<(button)))
 
 /*
  * globals
@@ -532,6 +561,14 @@ UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
   return result;
 }
 
+force_inline UI_key ui_hot_box_key(UI_context *ui) {
+  return ui->hot_box_key;
+}
+
+force_inline UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn) {
+  return ui->active_box_key[btn];
+}
+
 UI_box* ui_make_transient_box(UI_context *ui) {
   return ui_make_box_from_key(ui, ((UI_key){0}));
 }
@@ -624,8 +661,14 @@ UI_box* ui_make_box_from_strf(UI_context *ui, char *fmt, ...) {
   return box;
 }
 
+force_inline Vector2 ui_mouse_drag_delta(UI_context *ui) {
+  return Vector2Subtract(ui->mouse_pos, ui->mouse_drag_start_pos);
+}
+
 UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
-  UI_signal result = {0};
+  b32 taken = 0;
+
+  UI_signal sig = {0};
 
   // TODO box stacking one on top of the other
 
@@ -650,50 +693,106 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     }
   }
 
-  b32 mouse_in_bounds = CheckCollisionPointRec(ui->mouse_pos, box_rec);
+  b8 mouse_in_bounds = CheckCollisionPointRec(ui->mouse_pos, box_rec);
 
-  if(mouse_in_bounds) {
-    result.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
+  for(UI_mouse_button btn = UI_MOUSE_BUTTON_LEFT; btn < UI_MOUSE_BUTTON_COUNT; btn++) {
+    b8 btn_on = ui->mouse_buttons_active & ui_mouse_button_mask(btn);
 
-#define X(action) if(ui->input_flags & UI_INPUT_FLAG_##action) { result.flags |= UI_SIGNAL_FLAG_##action; }
-    UI_MOUSE_BUTTON_ACTIONS;
-#undef X
-
-#define X(button) \
-    if(ui->input_flags & UI_INPUT_FLAG_##button##_MOUSE_PRESS) { \
-      if(ui->mouse_pos_delta.x != 0 && ui->mouse_pos_delta.y != 0) { \
-        result.flags |= UI_SIGNAL_FLAG_##button##_MOUSE_DRAG; \
-      } \
+    if(mouse_in_bounds) {
+      sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
+      ui->hot_box_key = box->key;
+    } else {
+      ui->hot_box_key = ui_key_nil();
     }
-    X(LEFT);
-    X(RIGHT);
-    X(MIDDLE);
-#undef X
+
+    if((ui->input_flags & UI_INPUT_FLAG_MOUSE_PRESS) &&
+        btn_on &&
+        mouse_in_bounds
+      )
+    {
+      taken = 1;
+      sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn);
+      ui->active_box_key[btn] = box->key;
+      ui->mouse_drag_start_pos = ui->mouse_pos;
+    }
+
+    if(ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE &&
+        btn_on &&
+        ui_key_match(ui_active_box_key(ui, btn), box->key) &&
+        mouse_in_bounds
+      )
+    {
+      taken = 1;
+      sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE << btn);
+      sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_CLICK << btn);
+      ui->active_box_key[btn] = ui_key_nil();
+    }
+
+    if(ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE &&
+        btn_on &&
+        ui_key_match(ui_active_box_key(ui, btn), box->key) &&
+        !mouse_in_bounds
+      )
+    {
+      taken = 1;
+      sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE << btn);
+      ui->hot_box_key = ui_key_nil();
+      ui->active_box_key[btn] = ui_key_nil();
+    }
+
+    /* dragging */
+    if((sig.flags & (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn)) ||
+        ui_key_match(ui_active_box_key(ui, btn), box->key)
+      )
+    {
+      taken = 1;
+      sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG << btn);
+    }
 
   }
 
-  return result;
+  if(taken) {
+    ui->took_input_event = 1;
+  }
+
+  return sig;
 }
 
 void ui_get_input(UI_context *ui) {
+  ui->took_input_event = 0;
+  ui->input_flags = 0;
+  ui->mouse_buttons_active = 0;
+
   ui->mouse_pos = GetMousePosition();
-  ui->mouse_pos_delta = GetMouseDelta();
   ui->scroll_delta = GetMouseWheelMoveV();
   ui->keyboard_key_pressed = PeekKeyPressed();
 
-  ui->input_flags =
-    (UI_INPUT_FLAG_LEFT_MOUSE_CLICK & -IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) |
-    (UI_INPUT_FLAG_LEFT_MOUSE_PRESS & -IsMouseButtonDown(MOUSE_LEFT_BUTTON)) |
-    (UI_INPUT_FLAG_LEFT_MOUSE_RELEASE & -IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) |
-    (UI_INPUT_FLAG_RIGHT_MOUSE_CLICK & -IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) |
-    (UI_INPUT_FLAG_RIGHT_MOUSE_PRESS & -IsMouseButtonDown(MOUSE_RIGHT_BUTTON)) |
-    (UI_INPUT_FLAG_RIGHT_MOUSE_RELEASE & -IsMouseButtonReleased(MOUSE_RIGHT_BUTTON)) |
-    (UI_INPUT_FLAG_MIDDLE_MOUSE_CLICK & -IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) |
-    (UI_INPUT_FLAG_MIDDLE_MOUSE_PRESS & -IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) |
-    (UI_INPUT_FLAG_MIDDLE_MOUSE_RELEASE & -IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON)) |
-    ((ui->scroll_delta.x != 0.0f && ui->scroll_delta.y != 0.0f) ? UI_INPUT_FLAG_MOUSE_SCROLLED : 0) |
-    ((ui->keyboard_key_pressed != 0) ? UI_INPUT_FLAG_KEYBOARD_PRESSED : 0) |
-    0;
+  int raylib_mouse_buttons[] = {
+    MOUSE_LEFT_BUTTON,
+    MOUSE_RIGHT_BUTTON,
+    MOUSE_MIDDLE_BUTTON,
+  };
+
+  for(int i = 0; i < ARRLEN(raylib_mouse_buttons); i++) {
+    if(IsMouseButtonPressed(raylib_mouse_buttons[i])) {
+      ui->input_flags |= UI_INPUT_FLAG_MOUSE_PRESS;
+      ui->mouse_buttons_active |= (UI_mouse_button_mask)(1<<i);
+    }
+
+    if(IsMouseButtonReleased(raylib_mouse_buttons[i])) {
+      ui->input_flags |= UI_INPUT_FLAG_MOUSE_RELEASE;
+      ui->mouse_buttons_active |= (UI_mouse_button_mask)(1<<i);
+    }
+
+  }
+
+  if(ui->scroll_delta.x != 0.0f && ui->scroll_delta.y != 0.0f) {
+    ui->input_flags |= UI_INPUT_FLAG_MOUSE_SCROLLED;
+  }
+
+  if(ui->keyboard_key_pressed != 0) {
+    ui->input_flags |= UI_INPUT_FLAG_KEYBOARD_PRESSED;
+  }
 
 }
 
@@ -1021,13 +1120,6 @@ UI_box_node* ui_push_box_node(UI_context *ui) {
   UI_box_node *node = 0;
 
   node = push_struct(ui->draw_arena, UI_box_node);
-
-  // I don't think this is necessary
-  //
-  //if(ui->box_node_free_list) {
-  //  node = sll_stack_pop(ui->box_node_free_list);
-  //} else {
-  //}
 
   return node;
 }
