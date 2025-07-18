@@ -25,6 +25,7 @@
 #define ALIGN_UP(x, align) (((x) + (align) - 1) & ~((align) - 1))
 #define STRINGIFY(x) #x
 #define GLSL(src) STRINGIFY(src)
+#define SWAP(a, b, T) do { T tmp = (a); (a) = (b); (b) = tmp; }while(0)
 
 #ifndef true
 #define true ((b8)1u)

@@ -295,7 +295,7 @@ void game_update_and_draw(Game *gp) {
         UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
         //UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT };
         ui_parent(container2)
-          ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
+          ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT|UI_BOX_FLAG_SCROLL)
           ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
           ui_semantic_width(child_width) ui_semantic_height(child_height)
           ui_text_align(UI_TEXT_ALIGN_CENTER)

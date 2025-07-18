@@ -30,7 +30,6 @@
   X(MOUSE_RELEASE) \
   X(MOUSE_CLICK) \
   X(MOUSE_SCROLL) \
-  X(MOUSE_SCROLLED) \
   X(KEYBOARD_PRESSED) \
 
 #define UI_SIGNAL_FLAGS \
@@ -40,9 +39,15 @@
   X(RIGHT_MOUSE_DRAG) \
   X(MIDDLE_MOUSE_DRAG) \
   \
+  X(SCROLL) \
+  \
   X(MOUSE_HOVERING) \
   X(MOUSE_OVER) \
 
+#define UI_MODIFIER_KEYS \
+  X(CONTROL) \
+  X(SHIFT) \
+  X(SUPER) \
 
 #define UI_BOX_FLAGS \
   X(IS_FLOATING) \
@@ -55,6 +60,16 @@
   X(MOUSE_CLICKABLE) \
   X(KEYBOARD_CLICKABLE) \
   X(SCROLL) \
+  X(VIEW_SCROLL_X) \
+  X(VIEW_SCROLL_Y) \
+  X(CLAMP_VIEW_X) \
+  X(CLAMP_VIEW_Y) \
+  X(SKIP_VIEW_OFFSET_X) \
+  X(SKIP_VIEW_OFFSET_Y) \
+
+#define UI_BOX_FLAG_VIEW_SCROLL (UI_BOX_FLAG_VIEW_SCROLL_X | UI_BOX_FLAG_VIEW_SCROLL_Y)
+#define UI_BOX_FLAG_CLAMP_VIEW (UI_BOX_FLAG_CLAMP_VIEW_X | UI_BOX_FLAG_CLAMP_VIEW_Y)
+#define UI_BOX_FLAG_SKIP_VIEW_OFFSET (UI_BOX_FLAG_SKIP_VIEW_OFFSET_X | UI_BOX_FLAG_SKIP_VIEW_OFFSET_Y)
 
 
 #define UI_STYLE_PROPERTIES \
@@ -163,11 +178,17 @@ typedef enum UI_axis {
 } UI_axis;
 
 typedef enum UI_modifier_keys {
-  UI_MOD_CONTROL = 0,
-  UI_MOD_SHIFT,
-  UI_MOD_SUPER,
-  UI_MOD_COUNT,
+  UI_MOD_INVALID = -1,
+#define X(mod) UI_MOD_##mod,
+  UI_MODIFIER_KEYS
+#undef X
+    UI_MOD_COUNT,
 } UI_modifier_keys;
+
+typedef u32 UI_modifier_keys_mask;
+#define X(mod) const UI_modifier_keys_mask UI_MOD_MASK_##mod = (1u<<UI_MOD_##mod);
+UI_MODIFIER_KEYS
+#undef X
 
 typedef enum UI_mouse_button {
   UI_MOUSE_BUTTON_INVALID = -1,
@@ -292,7 +313,7 @@ struct UI_box {
   Color text_color;
   Color border_color;
   f32 border_size;
-  union { // TODO corner radius
+  union {
     struct {
       f32 corner_radius_0;
       f32 corner_radius_1;
@@ -346,7 +367,7 @@ struct UI_box {
   u64 last_visited_build_index;
   f32 view_offset[2];
   f32 view_offset_target[2];
-  f32 view_bounds[2]; // dunno what ~rjf uses this for
+  f32 view_bounds[2];
   f32 hot_time;
   f32 active_time;
 };
@@ -356,16 +377,16 @@ struct UI_signal {
   UI_box *box;
   union {
     struct {
-      f32 scroll_x;
-      f32 scroll_y;
+      s16 scroll_x;
+      s16 scroll_y;
     };
     struct {
-      f32 scroll_0;
-      f32 scroll_1;
+      s16 scroll_0;
+      s16 scroll_1;
     };
-    f32 scroll[2];
+    s16 scroll[2];
   };
-  u32 modifier_keys; // using the raylib ones for the moment
+  UI_modifier_keys_mask modifier_keys;
 };
 
 struct UI_box_node {
@@ -406,6 +427,7 @@ struct UI_context {
   Vector2 mouse_pos;
   Vector2 mouse_drag_start_pos;
   Vector2 scroll_delta;
+  UI_modifier_keys_mask modifier_keys;
   u32 keyboard_key_pressed;
   b32 took_input_event;
 
@@ -773,6 +795,63 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
 
   }
 
+  if((box->flags & UI_BOX_FLAG_SCROLL) &&
+      (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
+      (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
+      mouse_in_bounds)
+  {
+    taken = 1;
+    s16 delta[2] = {
+      (ui->scroll_delta.x > 0) ? 1 : -1, 
+      (ui->scroll_delta.y > 0) ? 1 : -1, 
+    };
+
+    if(ui->modifier_keys & UI_MOD_MASK_SHIFT) {
+      SWAP(delta[0], delta[1], s16);
+    }
+
+    sig.scroll[0] = delta[0];
+    sig.scroll[1] = delta[1];
+
+    sig.flags |= UI_SIGNAL_FLAG_SCROLL;
+  }
+
+  if((box->flags & UI_BOX_FLAG_VIEW_SCROLL) &&
+      box->first_visited_build_index != box->last_visited_build_index &&
+      (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
+      (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
+      mouse_in_bounds)
+  {
+    taken = 1;
+    s16 delta[2] = {
+      (ui->scroll_delta.x > 0) ? 1 : -1, 
+      (ui->scroll_delta.y > 0) ? 1 : -1, 
+    };
+
+    if(ui->modifier_keys & UI_MOD_MASK_SHIFT) {
+      SWAP(delta[0], delta[1], s16);
+    }
+
+    if(!(box->flags & UI_BOX_FLAG_VIEW_SCROLL_X)) {
+      if(delta[1] == 0) {
+        delta[1] = delta[0];
+      }
+      delta[0] = 0;
+    }
+
+    if(!(box->flags & UI_BOX_FLAG_VIEW_SCROLL_Y)) {
+      if(delta[0] == 0) {
+        delta[0] = delta[1];
+      }
+      delta[1] = 0;
+    }
+
+    box->view_offset_target[0] += (f32)delta[0];
+    box->view_offset_target[1] += (f32)delta[1];
+
+    sig.flags |= UI_SIGNAL_FLAG_SCROLL;
+  }
+
   if(taken) {
     ui->took_input_event = 1;
   }
@@ -784,6 +863,7 @@ void ui_get_input(UI_context *ui) {
   ui->took_input_event = 0;
   ui->input_flags = 0;
   ui->mouse_buttons_active = 0;
+  ui->modifier_keys = 0;
 
   ui->mouse_pos = GetMousePosition();
   ui->scroll_delta = GetMouseWheelMoveV();
@@ -808,12 +888,23 @@ void ui_get_input(UI_context *ui) {
 
   }
 
-  if(ui->scroll_delta.x != 0.0f && ui->scroll_delta.y != 0.0f) {
-    ui->input_flags |= UI_INPUT_FLAG_MOUSE_SCROLLED;
+  if(ui->scroll_delta.x != 0.0f || ui->scroll_delta.y != 0.0f) {
+    ui->input_flags |= UI_INPUT_FLAG_MOUSE_SCROLL;
   }
 
   if(ui->keyboard_key_pressed != 0) {
-    ui->input_flags |= UI_INPUT_FLAG_KEYBOARD_PRESSED;
+
+#define X(mod) \
+    if(ui->keyboard_key_pressed == KEY_LEFT_##mod || ui->keyboard_key_pressed == KEY_RIGHT_##mod) { \
+      ui->modifier_keys |= UI_MOD_MASK_##mod; \
+    }
+    UI_MODIFIER_KEYS;
+#undef X
+
+    if(ui->modifier_keys == 0) {
+      ui->input_flags |= UI_INPUT_FLAG_KEYBOARD_PRESSED;
+    }
+
   }
 
 }
@@ -1086,6 +1177,8 @@ void ui_end_build(UI_context *ui) {
   UI_PROFILE(ui_prof_time_to_calc_positions) { /* calculate the relative and then absolute positions of each box in pre order */
 
     for(UI_box *node = ui->root; node;) {
+      UI_box *parent = node->parent;
+
       u32 layout_axis = node->child_layout_axis;
       u32 axis = !layout_axis;
 
@@ -1098,9 +1191,9 @@ void ui_end_build(UI_context *ui) {
 
         f32 parent_layout_axis_pos = 0.0f;
         f32 parent_axis_pos = 0.0f;
-        if(node->parent) {
-          parent_layout_axis_pos = node->parent->final_rect.min[layout_axis];
-          parent_axis_pos = node->parent->final_rect.min[axis];
+        if(parent) {
+          parent_layout_axis_pos = parent->final_rect.min[layout_axis];
+          parent_axis_pos = parent->final_rect.min[axis];
         }
 
         f32 rel_layout_axis_pos = 0.0f;
@@ -1118,6 +1211,9 @@ void ui_end_build(UI_context *ui) {
       node->final_rect.min[axis] = final_axis_min;
       node->final_rect.max[layout_axis] = final_layout_axis_min + node->computed_size[layout_axis];
       node->final_rect.max[axis] = final_axis_min + node->computed_size[axis];
+
+      node->view_bounds[layout_axis] = node->computed_size[layout_axis];
+      node->view_bounds[axis] = node->computed_size[axis];
 
       if(node->first) {
         node = node->first;
