@@ -46,6 +46,8 @@
  */
 
 typedef struct Game Game;
+typedef struct Item_node Item_node;
+typedef struct Item_list Item_list;
 
 DECL_ARR_TYPE(Rectangle);
 DECL_SLICE_TYPE(Rectangle);
@@ -67,6 +69,19 @@ DECL_ARR_TYPE(f32_ptr);
  * struct bodies
  */
 
+struct Item_node {
+  Item_node *next;
+  Item_node *prev;
+  Str8 text;
+};
+
+struct Item_list {
+  Vector2 pos;
+  Str8 id;
+  Item_node *first;
+  Item_node *last;
+};
+
 struct Game {
 
   f32 dt;
@@ -85,6 +100,9 @@ struct Game {
   s32  files_count;
   s32  current_file;
 
+  Item_list item_lists[2];
+  Item_node *dragging_item;
+  Vector2 dragging_item_pos;
 };
 
 
@@ -98,6 +116,11 @@ void game_unload_assets(Game *gp);
 void game_update_and_draw(Game *gp);
 void game_close(Game *gp);
 void game_reset(Game *gp);
+
+UI_signal item_button(Game *gp, Item_node *item);
+UI_signal ui_button(UI_context *ui, Str8 label);
+UI_signal item_list_window(Game *gp, Item_list *list);
+void ui_spacer(UI_context *ui, f32 size);
 
 /*
  * entity settings
@@ -196,6 +219,43 @@ void game_reset(Game *gp) {
   arena_clear(gp->frame_arena);
   arena_clear(gp->level_arena);
 
+  Vector2 list_window_positions[] = {
+    { 40, 40 },
+    { 300, 100 },
+  };
+
+  Str8 list_items[2][5] = {
+    {
+      str8_lit("the red##item0"),
+      str8_lit("fox##item1"),
+      str8_lit("jumped over##item2"),
+      str8_lit("the##item3"),
+      str8_lit("cat##item4"),
+    },
+    {
+      str8_lit("Magnum est##item5"),
+      str8_lit("Imperium##item6"),
+      str8_lit("Romanum##item7"),
+      str8_lit("Super##item8"),
+      str8_lit("fluvius##item9"),
+    },
+  };
+
+  for(int i = 0; i < ARRLEN(gp->item_lists); i++) {
+    Item_list *list = &gp->item_lists[i];
+
+    list->pos = list_window_positions[i];
+
+    list->id = push_str8f(gp->main_arena, "##item_list_window_%i", i);
+
+    for(int j = 0; j < ARRLEN(list_items[i]); j++) {
+      Item_node *node = push_struct(gp->main_arena, Item_node);
+      node->text = push_str8_copy(gp->main_arena, list_items[i][j]);
+      dll_push_back(list->first, list->last, node);
+    }
+
+  }
+
 }
 
 void ui_spacer(UI_context *ui, f32 size) {
@@ -204,9 +264,62 @@ void ui_spacer(UI_context *ui, f32 size) {
     ui_make_transient_box(ui);
 }
 
+UI_signal item_button(Game *gp, Item_node *item) {
+  UI_context *ui = gp->ui;
+
+  UI_signal sig = {0}; 
+
+  UI_size size = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 };
+
+  ui_border_size(1.0f)
+    ui_semantic_size(size)
+    ui_text_align(UI_TEXT_ALIGN_CENTER)
+    ui_padding(4.0f)
+    ui_font_size(20.0f)
+    ui_font_spacing(2.0f)
+
+    sig = ui_button(gp->ui, item->text);
+
+  return sig;
+}
+
+UI_signal item_list_window(Game *gp, Item_list *list) {
+  UI_context *ui = gp->ui;
+
+  UI_box_flag flags =
+    UI_BOX_FLAG_IS_FLOATING |
+    UI_BOX_FLAG_DRAW_BACKGROUND |
+    UI_BOX_FLAG_MOUSE_CLICKABLE |
+    0;
+
+  UI_box *box;
+  UI_size size = { .kind = UI_SIZE_CHILDREN_SUM };
+
+  ui_child_layout_axis(UI_AXIS_Y)
+    ui_semantic_size(size)
+    ui_fixed_position(list->pos)
+
+    box = ui_make_box_from_str(gp->ui, flags, list->id);
+
+  UI_signal sig = ui_signal_from_box(gp->ui, box);
+
+  Color background_color = box->background_color;
+
+  if(gp->dragging_item) {
+    if(ui_key_match(ui_hot_box_key(ui), box->key)) {
+      box->background_color = ColorBrightness(background_color, 0.15f);
+    }
+  }
+
+  return sig;
+}
+
 UI_signal ui_button(UI_context *ui, Str8 label) {
 
   UI_box_flag flags =
+    UI_BOX_FLAG_DRAW_BACKGROUND |
+    UI_BOX_FLAG_DRAW_TEXT |
+    UI_BOX_FLAG_DRAW_BORDER |
     UI_BOX_FLAG_MOUSE_CLICKABLE |
     0;
 
@@ -229,6 +342,8 @@ UI_signal ui_button(UI_context *ui, Str8 label) {
 
 void game_update_and_draw(Game *gp) {
 
+  UI_context *ui = gp->ui;
+
   gp->dt = GetFrameTime();
 
   if(WindowShouldClose()) {
@@ -237,17 +352,63 @@ void game_update_and_draw(Game *gp) {
   }
 
 
-  //Vector2 mouse_position = GetMousePosition(); Vector2 scroll_delta = GetMouseWheelMoveV();
-
+  Color window_background_color = ColorBrightness(BLUE, -0.4f);
   Color background_color = { 83, 82, 99, 255 };
   Color border_color = { 53, 52, 69, 255 };
-  Color text_color = ColorBrightness(RAYWHITE, 0.8f);
-
-  UI_context *ui = gp->ui;
+  Color text_color = ColorBrightness(RAYWHITE, 0.7f);
 
   ui_build(ui) {
 
 #if 1
+    // TODO make drag and drop work
+    for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
+      Item_list *list = &gp->item_lists[list_i];
+
+      UI_signal window_sig;
+
+      ui_background_color(window_background_color)
+        window_sig = item_list_window(gp, list);
+
+      UI_box *window_box = window_sig.box;
+
+      if(gp->dragging_item) {
+        UI_signal dragging_sig;
+
+        ui_flags(UI_BOX_FLAG_IS_FLOATING) ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
+          dragging_sig = item_button(gp, gp->dragging_item);
+
+        if(dragging_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE &&
+            ui_key_match(ui_hot_box_key(ui), window_box->key)) {
+          Item_node *dropped_item = gp->dragging_item;
+          gp->dragging_item = 0;
+          dll_push_back(list->first, list->last, dropped_item);
+        }
+      }
+
+        ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
+        {
+
+          ui_parent(window_box)
+            for(Item_node *item = list->first, *next = 0; item; item = next) {
+              next = item->next;
+
+              UI_signal item_sig = item_button(gp, item);
+              UI_box *item_box = item_sig.box;
+
+              if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
+                gp->dragging_item = item;
+                gp->dragging_item_pos = item_box->fixed_position;
+                dll_remove(list->first, list->last, item);
+              }
+            }
+
+        }
+
+    }
+#endif
+
+#if 1
+#if 0
     Vector2 window_pos1 =
     {
       .x = 20,
@@ -282,7 +443,7 @@ void game_update_and_draw(Game *gp) {
       }
 #endif
 
-#if 1
+#if 0
     ui_child_layout_axis(1)
       ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
       ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250}))
@@ -292,8 +453,8 @@ void game_update_and_draw(Game *gp) {
         UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
 
         UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.7, };
-        UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
-        //UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT };
+        //UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
+        UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT };
         ui_parent(container2)
           ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT|UI_BOX_FLAG_SCROLL)
           ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
@@ -336,6 +497,7 @@ void game_update_and_draw(Game *gp) {
           }
 
       }
+#endif
 #endif
 
   }

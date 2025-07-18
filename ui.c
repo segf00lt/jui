@@ -59,6 +59,7 @@
   X(OVERFLOW_Y) \
   X(MOUSE_CLICKABLE) \
   X(KEYBOARD_CLICKABLE) \
+  X(DROP_SITE) \
   X(SCROLL) \
   X(VIEW_SCROLL_X) \
   X(VIEW_SCROLL_Y) \
@@ -93,7 +94,6 @@
   X( FIXED_WIDTH,         FixedWidth,        fixed_width,         f32,              ((f32)0),                           4           ) \
   X( FIXED_HEIGHT,        FixedHeight,       fixed_height,        f32,              ((f32)0),                           4           ) \
   X( PADDING,             Padding,           padding,             f32,              ((f32)2.0f),                        8           ) \
-  X( FLOATING_POSITION,   FloatingPosition,  floating_position,   Vector2,          ((Vector2){0}),                     4           ) \
   X( CHILD_LAYOUT_AXIS,   ChildLayoutAxis,   child_layout_axis,   UI_axis,          ((UI_axis)0),                       64          ) \
 
 #define UI_PROPERTIES \
@@ -101,6 +101,7 @@
   UI_STYLE_PROPERTIES \
   X( PARENT,              Parent,            parent,              UI_box_ptr,       nil_ui_box,                         16          ) \
   X( FLAGS,               Flags,             flags,               UI_box_flag,      0,                                  16          ) \
+  X( FIXED_POSITION,      FixedPosition,     fixed_position,      Vector2,          ((Vector2){0}),                     4           ) \
   X( EXCLUDE_FLAGS,       ExcludeFlags,      exclude_flags,       UI_box_flag,      0,                                  16          ) \
 
 #define ui_background_color(value) ui_prop(background_color, (value))
@@ -128,7 +129,7 @@
 
 #define ui_padding(value) ui_prop(padding, (value))
 
-#define ui_floating_position(value) ui_prop(floating_position, (value))
+#define ui_fixed_position(value) ui_prop(fixed_position, (value))
 
 #define ui_child_layout_axis(value) ui_prop(child_layout_axis, (value))
 
@@ -355,12 +356,14 @@ struct UI_box {
     f32 fixed_size[2];
   };
 
-  f32 computed_size[2];
-  f32 computed_rel_pos[2];
-  struct {
-    f32 min[2];
-    f32 max[2];
-  } final_rect;
+  f32 fixed_rel_pos[2];
+  union {
+    Vector2 fixed_position;
+    struct {
+      f32 min[2];
+      f32 max[2];
+    } final_rect;
+  };
 
 
   u64 first_visited_build_index;
@@ -425,7 +428,7 @@ struct UI_context {
   UI_input_flag input_flags;
   UI_mouse_button_mask mouse_buttons_active;
   Vector2 mouse_pos;
-  Vector2 mouse_drag_start_pos;
+  Vector2 drag_start_pos;
   Vector2 scroll_delta;
   UI_modifier_keys_mask modifier_keys;
   u32 keyboard_key_pressed;
@@ -455,13 +458,13 @@ UI_key ui_key_from_str(Str8 str);
 b32 ui_key_match(UI_key a, UI_key b);
 
 UI_box* ui_get_box_from_key(UI_context *ui, UI_key key);
-UI_box* ui_get_box_from_str(UI_context *ui, UI_key key);
+UI_box* ui_get_box_from_str(UI_context *ui, Str8 s);
 
 UI_signal ui_signal_from_box(UI_context *ui, UI_box *box);
 
 Str8 ui_strip_id_from_text(Str8 text);
 
-Vector2 ui_mouse_drag_delta(UI_context *ui);
+Vector2 ui_drag_delta(UI_context *ui);
 
 UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key);
 UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str);
@@ -597,6 +600,10 @@ UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
   return result;
 }
 
+UI_box* ui_get_box_from_str(UI_context *ui, Str8 s) {
+  return ui_get_box_from_key(ui, ui_key_from_str(s));
+}
+
 force_inline UI_key ui_hot_box_key(UI_context *ui) {
   return ui->hot_box_key;
 }
@@ -699,14 +706,14 @@ UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...)
   return box;
 }
 
-force_inline Vector2 ui_mouse_drag_delta(UI_context *ui) {
-  return Vector2Subtract(ui->mouse_pos, ui->mouse_drag_start_pos);
+force_inline Vector2 ui_drag_delta(UI_context *ui) {
+  return Vector2Subtract(ui->mouse_pos, ui->drag_start_pos);
 }
 
 UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
   b32 taken = 0;
 
-  UI_signal sig = {0};
+  UI_signal sig = { .box = box };
 
   // TODO box stacking one on top of the other
 
@@ -754,7 +761,7 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       taken = 1;
       sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn);
       ui->active_box_key[btn] = box->key;
-      ui->mouse_drag_start_pos = ui->mouse_pos;
+      ui->drag_start_pos = ui->mouse_pos;
     }
 
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
@@ -920,12 +927,12 @@ void ui_begin_build(UI_context *ui) {
   ui->root = dummy;
 
   ui_push_prop(parent, dummy);
-  ui_push_prop(flags, UI_BOX_FLAG_IS_FLOATING);
+  ui_push_prop(flags, 0);
   ui_push_prop(semantic_width,  ((UI_size){ .kind = UI_SIZE_NONE, }));
   ui_push_prop(semantic_height, ((UI_size){ .kind = UI_SIZE_NONE, }));
   ui_push_prop(text_align, (UI_text_align){ UI_TEXT_ALIGN_LEFT });
-  ui_push_prop(font_size, 10);
-  ui_push_prop(font_spacing, 1);
+  ui_push_prop(font_size, 0);
+  ui_push_prop(font_spacing, 0);
 
   ui_get_input(ui);
 
@@ -940,16 +947,18 @@ f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
     sum = ui_calc_downward_dependent_sizes(box->first, axis, box->child_layout_axis);
 
     if(box->semantic_size[axis].kind == UI_SIZE_CHILDREN_SUM) {
-      box->computed_size[axis] = sum;
+      box->fixed_size[axis] = sum;
     } else {
-      sum += box->computed_size[axis];
+      sum += box->fixed_size[axis];
     }
 
-  } else {
+  }
+
+  {
 
     if(axis == layout_axis) {
       if(!(box->flags & UI_BOX_FLAG_IS_FLOATING)) {
-        sum += box->computed_size[axis];
+        sum += box->fixed_size[axis];
       }
 
       if(box->next) {
@@ -957,7 +966,7 @@ f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
       }
     } else {
       if(!(box->flags & UI_BOX_FLAG_IS_FLOATING)) {
-        sum = MAX(box->computed_size[axis], sum);
+        sum = MAX(box->fixed_size[axis], sum);
       }
 
       if(box->next) {
@@ -982,7 +991,6 @@ void ui_end_build(UI_context *ui) {
     UI_box *box = ui->box_table[table_i].first;
     for(; box; box = box->hash_next) {
       if(box->last_visited_build_index < ui->build_index || ui_key_match(box->key, ui_key_nil())) {
-        UNREACHABLE;
         dll_remove(
             ui->box_table[table_i].first,
             ui->box_table[table_i].last,
@@ -1006,7 +1014,7 @@ void ui_end_build(UI_context *ui) {
               break;
             case UI_SIZE_PIXELS:
               {
-                node->computed_size[axis] = size.value;
+                node->fixed_size[axis] = size.value;
               } break;
             case UI_SIZE_TEXT_CONTENT:
               {
@@ -1023,7 +1031,7 @@ void ui_end_build(UI_context *ui) {
 
                 f32 padding = size.value + TIMES2(node->padding);
 
-                node->computed_size[axis] = text_size_on_axis + padding;
+                node->fixed_size[axis] = text_size_on_axis + padding;
 
                 scope_end(scope);
               } break;
@@ -1052,7 +1060,7 @@ void ui_end_build(UI_context *ui) {
 
           if(size.kind == UI_SIZE_PERCENT_OF_PARENT) {
             if(node->parent) {
-              node->computed_size[axis] = size.value * node->parent->computed_size[axis];
+              node->fixed_size[axis] = size.value * node->parent->fixed_size[axis];
             }
           }
 
@@ -1081,33 +1089,33 @@ void ui_end_build(UI_context *ui) {
         for(UI_box *node = ui->root; node;) {
 
           if(axis != node->child_layout_axis && !(node->flags & (UI_BOX_FLAG_OVERFLOW_X << axis))) {
-            f32 allowed_size = node->computed_size[axis];
+            f32 allowed_size = node->fixed_size[axis];
 
             for(UI_box *child = node->first; child; child = child->next) {
               // TODO floating on x and y axis separately
               if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
-                f32 child_size = child->computed_size[axis];
+                f32 child_size = child->fixed_size[axis];
                 f32 violation = child_size - allowed_size;
                 f32 max_fixup = child_size;
                 f32 fixup = Clamp(violation, 0, max_fixup);
 
                 if(fixup > 0) {
-                  child->computed_size[axis] -= fixup;
+                  child->fixed_size[axis] -= fixup;
                 }
               }
             }
           }
 
           if(axis == node->child_layout_axis && !(node->flags &(UI_BOX_FLAG_OVERFLOW_X << axis))) {
-            f32 total_allowed_size = node->computed_size[axis];
+            f32 total_allowed_size = node->fixed_size[axis];
             f32 total_size = 0;
             f32 total_weighted_size = 0;
 
             for(UI_box *child = node->first; child; child = child->next) {
               // TODO floating on x and y axis separately
               if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
-                total_size += child->computed_size[axis];
-                total_weighted_size += child->computed_size[axis] * (1-child->semantic_size[axis].strictness);
+                total_size += child->fixed_size[axis];
+                total_weighted_size += child->fixed_size[axis] * (1-child->semantic_size[axis].strictness);
               }
             }
 
@@ -1123,7 +1131,7 @@ void ui_end_build(UI_context *ui) {
                 for(UI_box *child = node->first; child; child = child->next, child_index += 1) {
                   // TODO floating on x and y axis separately
                   if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
-                    f32 fixup_size_this_child = child->computed_size[axis] * (1-child->semantic_size[axis].strictness);
+                    f32 fixup_size_this_child = child->fixed_size[axis] * (1-child->semantic_size[axis].strictness);
                     fixup_size_this_child = CLAMP_BOT(0, fixup_size_this_child);
                     child_fixups[child_index] = fixup_size_this_child;
                   }
@@ -1137,7 +1145,7 @@ void ui_end_build(UI_context *ui) {
                   if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
                     f32 fixup_percent = (violation / total_weighted_size);
                     fixup_percent = Clamp(fixup_percent, 0, 1);
-                    child->computed_size[axis] -= child_fixups[child_index] * fixup_percent;
+                    child->fixed_size[axis] -= child_fixups[child_index] * fixup_percent;
                   }
                 }
               }
@@ -1150,13 +1158,13 @@ void ui_end_build(UI_context *ui) {
           if(node->flags & (UI_BOX_FLAG_OVERFLOW_X << axis)) {
             for(UI_box *child = node->first; child; child = child->next) {
               if(child->semantic_size[axis].kind == UI_SIZE_PERCENT_OF_PARENT) {
-                child->computed_size[axis] = node->computed_size[axis] * child->semantic_size[axis].value;
+                child->fixed_size[axis] = node->fixed_size[axis] * child->semantic_size[axis].value;
               }
             }
           }
 
           for(UI_box *child = node->first; child; child = child->next) {
-            child->computed_size[axis] = MAX(child->computed_size[axis], child->min_size[axis]);
+            child->fixed_size[axis] = MAX(child->fixed_size[axis], child->min_size[axis]);
           }
 
           if(node->first) {
@@ -1185,8 +1193,8 @@ void ui_end_build(UI_context *ui) {
       f32 final_layout_axis_min = 0.0f;
       f32 final_axis_min = 0.0f;
       if(node->flags & UI_BOX_FLAG_IS_FLOATING) {
-        final_layout_axis_min = (&(node->floating_position.x))[layout_axis];
-        final_axis_min = (&(node->floating_position.x))[axis];
+        final_layout_axis_min = (&(node->fixed_position.x))[layout_axis];
+        final_axis_min = (&(node->fixed_position.x))[axis];
       } else {
 
         f32 parent_layout_axis_pos = 0.0f;
@@ -1198,10 +1206,10 @@ void ui_end_build(UI_context *ui) {
 
         f32 rel_layout_axis_pos = 0.0f;
         if(node->prev) {
-          rel_layout_axis_pos = node->prev->computed_rel_pos[layout_axis] + node->prev->computed_size[layout_axis];
+          rel_layout_axis_pos = node->prev->fixed_rel_pos[layout_axis] + node->prev->fixed_size[layout_axis];
         }
 
-        node->computed_rel_pos[layout_axis] = rel_layout_axis_pos;
+        node->fixed_rel_pos[layout_axis] = rel_layout_axis_pos;
 
         final_layout_axis_min = parent_layout_axis_pos + rel_layout_axis_pos;
         final_axis_min = parent_axis_pos;
@@ -1209,11 +1217,11 @@ void ui_end_build(UI_context *ui) {
 
       node->final_rect.min[layout_axis] = final_layout_axis_min;
       node->final_rect.min[axis] = final_axis_min;
-      node->final_rect.max[layout_axis] = final_layout_axis_min + node->computed_size[layout_axis];
-      node->final_rect.max[axis] = final_axis_min + node->computed_size[axis];
+      node->final_rect.max[layout_axis] = final_layout_axis_min + node->fixed_size[layout_axis];
+      node->final_rect.max[axis] = final_axis_min + node->fixed_size[axis];
 
-      node->view_bounds[layout_axis] = node->computed_size[layout_axis];
-      node->view_bounds[axis] = node->computed_size[axis];
+      node->view_bounds[layout_axis] = node->fixed_size[layout_axis];
+      node->view_bounds[axis] = node->fixed_size[axis];
 
       if(node->first) {
         node = node->first;
@@ -1282,8 +1290,6 @@ void dump_UI_box(const UI_box *box) {
            box->semantic_size[0].value, box->semantic_size[1].value);
 
     printf("  padding = %.2f\n", box->padding);
-    printf("  floating_position = {%.2f, %.2f}\n",
-           box->floating_position.x, box->floating_position.y);
     printf("  child_layout_axis = %d\n", box->child_layout_axis);
 
     printf("  text = \"%.*s\"\n", (int)box->text.len, box->text.s);
@@ -1293,10 +1299,10 @@ void dump_UI_box(const UI_box *box) {
     printf("  fixed_size = [%.2f, %.2f]\n",
            box->fixed_size[0], box->fixed_size[1]);
 
-    printf("  computed_size = [%.2f, %.2f]\n",
-           box->computed_size[0], box->computed_size[1]);
-    printf("  computed_rel_pos = [%.2f, %.2f]\n",
-           box->computed_rel_pos[0], box->computed_rel_pos[1]);
+    printf("  fixed_size = [%.2f, %.2f]\n",
+           box->fixed_size[0], box->fixed_size[1]);
+    printf("  fixed_rel_pos = [%.2f, %.2f]\n",
+           box->fixed_rel_pos[0], box->fixed_rel_pos[1]);
 
     printf("  final_rect.min = [%.2f, %.2f]\n",
            box->final_rect.min[0], box->final_rect.min[1]);
