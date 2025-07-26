@@ -1,18 +1,11 @@
+#include "base.h"
+
 #include "raylib.h"
 #include "raymath.h"
 #include "rlgl.h"
 
-#include "basic.h"
-#include "arena.h"
-#include "str.h"
-#include "context.h"
-#include "array.h"
-#include "sprite.h"
-#include "stb_sprintf.h"
-
 #include "ui.c"
 
-#undef force_inline
 
 /*
  * constants
@@ -80,6 +73,7 @@ struct Item_list {
   Str8 id;
   Item_node *first;
   Item_node *last;
+  UI_signal sig;
 };
 
 struct Game {
@@ -136,6 +130,10 @@ void ui_spacer(UI_context *ui, f32 size);
  * globals
  */
 
+int text_line_spacing = 5;
+
+int _nocheckin = 0;
+
 Vector2 window_pos2 =
 {
   .x = 400,
@@ -159,13 +157,7 @@ Vector2 save_window_pos2;
 #define frame_push_array_no_zero(T, n) (T*)push_array_no_zero(gp->frame_arena, T, n)
 #define level_push_array_no_zero(T, n) (T*)push_array_no_zero(gp->level_arena, T, n)
 
-#define frame_scope_begin() scope_begin(gp->frame_arena)
-#define frame_scope_end(scope) scope_end(scope)
-
-#define level_scope_begin() scope_begin(gp->level_arena)
-#define level_scope_end(scope) scope_end(scope)
-
-Game* game_init(void) {
+func Game* game_init(void) {
 
   SetRandomSeed(42);
   SetConfigFlags(FLAG_WINDOW_RESIZABLE);
@@ -176,16 +168,16 @@ Game* game_init(void) {
   //SetMasterVolume(GetMasterVolume() * 0.5);
 
   SetTargetFPS(TARGET_FPS);
-  SetTextLineSpacing(10);
+  SetTextLineSpacing(text_line_spacing);
   SetTraceLogLevel(LOG_DEBUG);
   SetExitKey(0);
 
   Game *gp = os_alloc(sizeof(Game));
   memory_set(gp, 0, sizeof(Game));
 
-  gp->main_arena  = arena_alloc(.size = MB(3));
-  gp->level_arena = arena_alloc(.size = KB(16));
-  gp->frame_arena = arena_alloc(.size = KB(16));
+  gp->main_arena  = arena_alloc(MB(3));
+  gp->level_arena = arena_alloc(KB(16));
+  gp->frame_arena = arena_alloc(KB(16));
 
   gp->ui = ui_init();
 
@@ -196,15 +188,15 @@ Game* game_init(void) {
   return gp;
 }
 
-void game_load_assets(Game *gp) {
+func void game_load_assets(Game *gp) {
 
 }
 
-void game_unload_assets(Game *gp) {
+func void game_unload_assets(Game *gp) {
 
 }
 
-void game_close(Game *gp) {
+func void game_close(Game *gp) {
   game_unload_assets(gp);
 
   ui_close(gp->ui);
@@ -213,7 +205,7 @@ void game_close(Game *gp) {
   //CloseAudioDevice();
 }
 
-void game_reset(Game *gp) {
+func void game_reset(Game *gp) {
 
   arena_clear(gp->main_arena);
   arena_clear(gp->frame_arena);
@@ -224,17 +216,19 @@ void game_reset(Game *gp) {
     { 300, 100 },
   };
 
-  Str8 list_items[2][5] = {
+  Str8 list_items[2][6] = {
     {
       str8_lit("the red##item0"),
       str8_lit("fox##item1"),
       str8_lit("jumped over##item2"),
+      str8_lit("jumped over##item12"),
       str8_lit("the##item3"),
       str8_lit("cat##item4"),
     },
     {
       str8_lit("Magnum est##item5"),
       str8_lit("Imperium##item6"),
+      str8_lit("jumped over##item13"),
       str8_lit("Romanum##item7"),
       str8_lit("Super##item8"),
       str8_lit("fluvius##item9"),
@@ -246,11 +240,11 @@ void game_reset(Game *gp) {
 
     list->pos = list_window_positions[i];
 
-    list->id = push_str8f(gp->main_arena, "##item_list_window_%i", i);
+    list->id = str8f(gp->main_arena, "##item_list_window_%i", i);
 
     for(int j = 0; j < ARRLEN(list_items[i]); j++) {
       Item_node *node = push_struct(gp->main_arena, Item_node);
-      node->text = push_str8_copy(gp->main_arena, list_items[i][j]);
+      node->text = str8_copy(gp->main_arena, list_items[i][j]);
       dll_push_back(list->first, list->last, node);
     }
 
@@ -258,13 +252,13 @@ void game_reset(Game *gp) {
 
 }
 
-void ui_spacer(UI_context *ui, f32 size) {
+func void ui_spacer(UI_context *ui, f32 size) {
   ui_flags(0)
     ui_semantic_size(((UI_size){ .kind = UI_SIZE_PIXELS, .value = size, .strictness = 1.0f }))
     ui_make_transient_box(ui);
 }
 
-UI_signal item_button(Game *gp, Item_node *item) {
+func UI_signal item_button(Game *gp, Item_node *item) {
   UI_context *ui = gp->ui;
 
   UI_signal sig = {0}; 
@@ -283,13 +277,14 @@ UI_signal item_button(Game *gp, Item_node *item) {
   return sig;
 }
 
-UI_signal item_list_window(Game *gp, Item_list *list) {
+func UI_signal item_list_window(Game *gp, Item_list *list) {
   UI_context *ui = gp->ui;
 
   UI_box_flag flags =
     UI_BOX_FLAG_IS_FLOATING |
     UI_BOX_FLAG_DRAW_BACKGROUND |
     UI_BOX_FLAG_MOUSE_CLICKABLE |
+    UI_BOX_FLAG_DROP_SITE |
     0;
 
   UI_box *box;
@@ -297,11 +292,12 @@ UI_signal item_list_window(Game *gp, Item_list *list) {
 
   ui_child_layout_axis(UI_AXIS_Y)
     ui_semantic_size(size)
-    ui_fixed_position(list->pos)
+    ui_floating_position(list->pos)
 
     box = ui_make_box_from_str(gp->ui, flags, list->id);
 
-  UI_signal sig = ui_signal_from_box(gp->ui, box);
+  UI_signal sig = { .box = box };
+  //UI_signal sig = ui_signal_from_box(gp->ui, box);
 
   Color background_color = box->background_color;
 
@@ -314,7 +310,7 @@ UI_signal item_list_window(Game *gp, Item_list *list) {
   return sig;
 }
 
-UI_signal ui_button(UI_context *ui, Str8 label) {
+func UI_signal ui_button(UI_context *ui, Str8 label) {
 
   UI_box_flag flags =
     UI_BOX_FLAG_DRAW_BACKGROUND |
@@ -330,6 +326,7 @@ UI_signal ui_button(UI_context *ui, Str8 label) {
   Color background_color = box->background_color;
 
   if(ui_key_match(ui_hot_box_key(ui), box->key)) {
+    _nocheckin += 1;
     box->background_color = ColorBrightness(background_color, 0.12f);
   }
 
@@ -340,7 +337,13 @@ UI_signal ui_button(UI_context *ui, Str8 label) {
   return sig;
 }
 
-void game_update_and_draw(Game *gp) {
+func void game_update_and_draw(Game *gp) {
+
+  if(IsKeyPressed(KEY_F5)) {
+    game_reset(gp);
+  }
+
+  _nocheckin = 0;
 
   UI_context *ui = gp->ui;
 
@@ -361,6 +364,10 @@ void game_update_and_draw(Game *gp) {
 
 #if 1
     // TODO make drag and drop work
+
+
+    UI_signal dragging_sig = {0};
+
     for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
       Item_list *list = &gp->item_lists[list_i];
 
@@ -369,21 +376,18 @@ void game_update_and_draw(Game *gp) {
       ui_background_color(window_background_color)
         window_sig = item_list_window(gp, list);
 
+      list->sig = window_sig;
+
       UI_box *window_box = window_sig.box;
 
-      if(gp->dragging_item) {
-        UI_signal dragging_sig;
-
-        ui_flags(UI_BOX_FLAG_IS_FLOATING) ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
-          dragging_sig = item_button(gp, gp->dragging_item);
-
-        if(dragging_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE &&
-            ui_key_match(ui_hot_box_key(ui), window_box->key)) {
-          Item_node *dropped_item = gp->dragging_item;
-          gp->dragging_item = 0;
-          dll_push_back(list->first, list->last, dropped_item);
-        }
-      }
+      //if(window_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE &&
+      //    ui_key_match(ui_drop_hot_box_key(ui), window_box->key)) {
+      //if(window_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE) {
+      //  UNREACHABLE;
+      //  Item_node *dropped_item = gp->dragging_item;
+      //  gp->dragging_item = 0;
+      //  dll_push_back(list->first, list->last, dropped_item);
+      //}
 
         ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
         {
@@ -397,7 +401,8 @@ void game_update_and_draw(Game *gp) {
 
               if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
                 gp->dragging_item = item;
-                gp->dragging_item_pos = item_box->fixed_position;
+                gp->dragging_item_pos.x = item_box->final_rect_min[0];
+                gp->dragging_item_pos.y = item_box->final_rect_min[1];
                 dll_remove(list->first, list->last, item);
               }
             }
@@ -405,10 +410,32 @@ void game_update_and_draw(Game *gp) {
         }
 
     }
+
+    if(gp->dragging_item) {
+
+      ui_flags(UI_BOX_FLAG_IS_FLOATING) ui_floating_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
+        ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
+        dragging_sig = item_button(gp, gp->dragging_item);
+
+      if(dragging_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE) {
+        for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
+          Item_list *list = &gp->item_lists[list_i];
+
+          if(ui_key_match(list->sig.box->key, ui_drop_hot_box_key(ui))) {
+            Item_node *dropped_item = gp->dragging_item;
+            dll_push_back(list->first, list->last, dropped_item);
+          }
+
+        }
+        gp->dragging_item = 0;
+      }
+
+    }
+
 #endif
 
-#if 1
 #if 0
+#if 1
     Vector2 window_pos1 =
     {
       .x = 20,
@@ -443,7 +470,7 @@ void game_update_and_draw(Game *gp) {
       }
 #endif
 
-#if 0
+#if 1
     ui_child_layout_axis(1)
       ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
       ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250}))
@@ -460,7 +487,7 @@ void game_update_and_draw(Game *gp) {
           ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
           ui_semantic_width(child_width) ui_semantic_height(child_height)
           ui_text_align(UI_TEXT_ALIGN_CENTER)
-          ui_corner_radius(0.1f)
+          ui_corner_radius(0.5f)
           //ui_corner_radius_0(0.8f)
           //ui_corner_radius_3(0.8f)
           //ui_corner_radius_2(0.8f)
@@ -479,7 +506,7 @@ void game_update_and_draw(Game *gp) {
                 }
 
                 if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
-                  window_pos2 = Vector2Add(save_window_pos2, ui_mouse_drag_delta(ui));
+                  window_pos2 = Vector2Add(save_window_pos2, ui_drag_delta(ui));
                 }
 
               }
@@ -494,6 +521,7 @@ void game_update_and_draw(Game *gp) {
             ui_button(ui, str8_lit("is##1_3"));
             ui_spacer(ui, spacing);
             ui_button(ui, str8_lit("joao##1_4"));
+
           }
 
       }
@@ -524,6 +552,7 @@ void game_update_and_draw(Game *gp) {
       X( time to do 1st pass,                           %f,        ui_prof_time_to_do_1st_pass) \
       X( time to solve size violations,                 %f,        ui_prof_time_to_solve_size_violations) \
       X( time to calc final positions,                  %f,        ui_prof_time_to_calc_positions) \
+      X( ui hot box key,                                %lu,       ui->hot_box_key.hash) \
       // \
 
 
@@ -531,7 +560,7 @@ void game_update_and_draw(Game *gp) {
 #define X(string, fmt, expr) #string": "#fmt"\n"
         DEBUG_OVERLAY_TABLE"%c";
 #undef X
-      Str8 debug_text = push_str8f(gp->frame_arena, debug_text_fmt,
+      Str8 debug_text = str8f(gp->frame_arena, debug_text_fmt,
 #define X(string, fmt, expr) (expr),
           DEBUG_OVERLAY_TABLE 0);
 #undef X

@@ -89,7 +89,7 @@ Str8        json_parse_raw_string(JSON_parser *p);
 #define JLIB_JSON_IMPL
 #endif
 
-void json_init_parser(JSON_parser *p, Arena *arena, u8 *src, s64 src_len) {
+func void json_init_parser(JSON_parser *p, Arena *arena, u8 *src, s64 src_len) {
   p->arena = arena;
   p->src = src;
   p->src_len = src_len;
@@ -99,7 +99,7 @@ void json_init_parser(JSON_parser *p, Arena *arena, u8 *src, s64 src_len) {
   p->root = 0;
 }
 
-force_inline JSON_value* json_alloc_value(JSON_parser *p) {
+func force_inline JSON_value* json_alloc_value(JSON_parser *p) {
   ASSERT(p->arena);
   return push_array_no_zero(p->arena, JSON_value, 1);
 }
@@ -110,12 +110,12 @@ force_inline JSON_value* json_alloc_value(JSON_parser *p) {
 //
 //}
 
-JSON_value* json_parse(JSON_parser *p) {
+func JSON_value* json_parse(JSON_parser *p) {
   p->root = json_parse_object(p);
   return p->root;
 }
 
-force_inline void json_parse_skip_whitespace(JSON_parser *p) {
+func force_inline void json_parse_skip_whitespace(JSON_parser *p) {
   while(p->pos < p->end) {
     switch(*p->pos) {
       default:
@@ -130,7 +130,7 @@ force_inline void json_parse_skip_whitespace(JSON_parser *p) {
   }
 }
 
-JSON_value* json_parse_object(JSON_parser *p) {
+func JSON_value* json_parse_object(JSON_parser *p) {
   if(*p->pos != '{') {
     return NULL;
   }
@@ -206,7 +206,7 @@ JSON_value* json_parse_object(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_array(JSON_parser *p) {
+func JSON_value* json_parse_array(JSON_parser *p) {
   if(*p->pos != '[') {
     return NULL;
   }
@@ -266,7 +266,7 @@ JSON_value* json_parse_array(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_value(JSON_parser *p) {
+func JSON_value* json_parse_value(JSON_parser *p) {
   json_parse_skip_whitespace(p);
 
   JSON_value *result = NULL;
@@ -289,7 +289,7 @@ JSON_value* json_parse_value(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_string(JSON_parser *p) {
+func JSON_value* json_parse_string(JSON_parser *p) {
   Str8 str = json_parse_raw_string(p);
 
   if(str.len == 0) {
@@ -303,7 +303,7 @@ JSON_value* json_parse_string(JSON_parser *p) {
   return result;
 }
 
-Str8 json_parse_raw_string(JSON_parser *p) {
+func Str8 json_parse_raw_string(JSON_parser *p) {
   if(*p->pos != '"') {
     return (Str8){0};
   }
@@ -385,7 +385,7 @@ Str8 json_parse_raw_string(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_number(JSON_parser *p) {
+func JSON_value* json_parse_number(JSON_parser *p) {
   u8 *end = NULL;
   f64 floating = strtod((char*)p->pos, (char**)&end);
 
@@ -405,7 +405,7 @@ JSON_value* json_parse_number(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_true(JSON_parser *p) {
+func JSON_value* json_parse_true(JSON_parser *p) {
   char s[] = "true";
 
   for(int i = 0; i < STRLEN(s); i++) {
@@ -423,7 +423,7 @@ JSON_value* json_parse_true(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_false(JSON_parser *p) {
+func JSON_value* json_parse_false(JSON_parser *p) {
   char s[] = "false";
 
   for(int i = 0; i < STRLEN(s); i++) {
@@ -441,7 +441,7 @@ JSON_value* json_parse_false(JSON_parser *p) {
   return result;
 }
 
-JSON_value* json_parse_null(JSON_parser *p) {
+func JSON_value* json_parse_null(JSON_parser *p) {
   char s[] = "null";
 
   for(int i = 0; i < STRLEN(s); i++) {

@@ -1,20 +1,14 @@
-#define _UNITY_BUILD_
+
+#include "base.h"
 
 #define NOB_IMPLEMENTATION
-
 #include "nob.h"
-#include "basic.h"
-#include "arena.h"
-#include "context.h"
-#include "str.h"
-#include "array.h"
-#include "os.h"
 
 
 #define CC "clang"
-#define DEV_FLAGS "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-D_UNITY_BUILD_", "-DDEBUG"
-#define RELEASE_FLAGS "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-D_UNITY_BUILD_"
-#define WASM_FLAGS "-Os", "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-pthreads-mem-growth", "-D_UNITY_BUILD_"
+#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-DDEBUG"
+#define RELEASE_FLAGS "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi"
+#define WASM_FLAGS "-Os", "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-pthreads-mem-growth"
 #define TARGET "ui_test.c"
 #define EXE "ui_test"
 #define LDFLAGS "-lraylib", "-lm", "-lpthread"
@@ -89,7 +83,7 @@
 
 #define CLAY_INCLUDE_OPTIONS "-I./third_party/clay/"
 
-#define INCLUDE_AND_LINK_OPTIONS RAYLIB_DEBUG_LINK_OPTIONS, CLAY_INCLUDE_OPTIONS
+#define INCLUDE_AND_LINK_OPTIONS RAYLIB_DEBUG_LINK_OPTIONS
 
 #ifdef OS_WINDOWS
 
@@ -336,6 +330,9 @@ Str8 raylib_path = str8_lit("./third_party/raylib");
 char _project_root_path[OS_PATH_LEN];
 Str8 project_root_path;
 
+Arena *main_arena;
+Arena *temp_arena;
+
 
 /* * * * * * * * * * * * * * * * * 
  * function headers
@@ -360,12 +357,12 @@ int load_nob_project_file(void);
 int build_raylib(void) {
   nob_log(NOB_INFO, "building raylib");
 
-  Str8 raylib_build_dir = scratch_push_str8f("%S/build", raylib_path);
+  Str8 raylib_build_dir = str8f(main_arena, "%S/build", raylib_path);
 
-  Str8 raylib_static_build_dir = scratch_push_str8f("%S/static", raylib_build_dir);
-  Str8 raylib_shared_build_dir = scratch_push_str8f("%S/shared", raylib_build_dir);
-  Str8 raylib_debug_build_dir = scratch_push_str8f("%S/debug", raylib_build_dir);
-  Str8 raylib_web_build_dir = scratch_push_str8f("%S/web", raylib_build_dir);
+  Str8 raylib_static_build_dir = str8f(main_arena, "%S/static", raylib_build_dir);
+  Str8 raylib_shared_build_dir = str8f(main_arena, "%S/shared", raylib_build_dir);
+  Str8 raylib_debug_build_dir = str8f(main_arena, "%S/debug", raylib_build_dir);
+  Str8 raylib_web_build_dir = str8f(main_arena, "%S/web", raylib_build_dir);
 
   // TODO os_mkdir()
   ASSERT(nob_mkdir_if_not_exists((char*)raylib_build_dir.s));
@@ -374,10 +371,10 @@ int build_raylib(void) {
   ASSERT(nob_mkdir_if_not_exists((char*)raylib_debug_build_dir.s));
   ASSERT(nob_mkdir_if_not_exists((char*)raylib_web_build_dir.s));
 
-  Str8 raylib_static_lib_path = scratch_push_str8f("%S/libraylib.a", raylib_static_build_dir);
-  Str8 raylib_shared_lib_path = scratch_push_str8f("%S/%S", raylib_shared_build_dir, raylib_shared_lib_name);
-  Str8 raylib_debug_lib_path = scratch_push_str8f("%S/%S", raylib_debug_build_dir, raylib_shared_lib_name);
-  Str8 raylib_web_lib_path = scratch_push_str8f("%S/libraylib.web.a", raylib_web_build_dir);
+  Str8 raylib_static_lib_path = str8f(main_arena, "%S/libraylib.a", raylib_static_build_dir);
+  Str8 raylib_shared_lib_path = str8f(main_arena, "%S/%S", raylib_shared_build_dir, raylib_shared_lib_name);
+  Str8 raylib_debug_lib_path = str8f(main_arena, "%S/%S", raylib_debug_build_dir, raylib_shared_lib_name);
+  Str8 raylib_web_lib_path = str8f(main_arena, "%S/libraylib.web.a", raylib_web_build_dir);
 
   typedef enum Raylib_build_kind {
     RAYLIB_BUILD_KIND_STATIC,
@@ -411,13 +408,13 @@ int build_raylib(void) {
   };
 
   Arr(Str8) object_files;
-  arr_init(object_files, context_scratch_arena);
+  arr_init(object_files, main_arena);
 
   Arr(Nob_Cmd) linker_cmds;
-  arr_init(linker_cmds, context_scratch_arena);
+  arr_init(linker_cmds, main_arena);
 
   Arr(Nob_Cmd) compile_cmds;
-  arr_init(compile_cmds, context_scratch_arena);
+  arr_init(compile_cmds, main_arena);
 
   for(int build_i = 0; build_i < ARRLEN(raylib_builds); build_i++) {
 
@@ -440,8 +437,8 @@ int build_raylib(void) {
 #endif
 
       Str8 file = files.d[i];
-      Str8 src_file = scratch_push_str8f("%S/%S.c", raylib_path, file);
-      Str8 object_file = scratch_push_str8f("%S/%S.o", build_dir, file);
+      Str8 src_file = str8f(main_arena, "%S/%S.c", raylib_path, file);
+      Str8 object_file = str8f(main_arena, "%S/%S.o", build_dir, file);
 
       arr_push(object_files, object_file);
 
@@ -519,7 +516,7 @@ int build_raylib(void) {
 
   nob_log(NOB_INFO, "compiling all builds of raylib");
   Arr(Nob_Proc) procs;
-  scratch_arr_init(procs);
+  arr_init(procs, main_arena);
 
   for(int i = 0; i < compile_cmds.count; i++) {
     arr_push(procs, nob_cmd_run_async(compile_cmds.d[i]));
@@ -560,11 +557,24 @@ int build_metaprogram(void) {
   return 1;
 }
 
+int build_meta(void) {
+  nob_log(NOB_INFO, "building new metaprogram");
+
+  run_tags();
+
+  Nob_Cmd cmd = {0};
+  nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", "meta.c", "-o", "meta");
+
+  if(!nob_cmd_run_sync(cmd)) return 0;
+
+  return 1;
+}
+
 int run_metaprogram(void) {
   nob_log(NOB_INFO, "running metaprogram");
 
   Nob_Cmd cmd = {0};
-  nob_cmd_append(&cmd, scratch_push_cstrf("%S/metaprogram", project_root_path));
+  nob_cmd_append(&cmd, cstrf(main_arena, "%S/metaprogram", project_root_path));
 
   if(!nob_cmd_run_sync(cmd)) return 0;
 
@@ -649,7 +659,7 @@ int build_itch(void) {
   ASSERT(nob_mkdir_if_not_exists("./build/itch"));
 
   char *target = "wasm_cradle.c";
-  nob_cmd_append(&cmd, EMCC, WASM_FLAGS, "--preload-file", "./aseprite/atlas.png", "--preload-file", "./sprites/the_sea.png", "--preload-file", "./sounds/", target, RAYLIB_STATIC_LINK_WASM_OPTIONS, RAYLIB_STATIC_LINK_WASM_OPTIONS, "-sEXPORTED_RUNTIME_METHODS=ccall,HEAPF32", "-sUSE_GLFW=3", "-sFORCE_FILESYSTEM=1", "-sMODULARIZE=1", "-sWASM_WORKERS=1", "-sUSE_PTHREADS=1", "-sWASM=1", "-sEXPORT_ES6=1", "--shell-file", "itch_shell.html", "-sGL_ENABLE_GET_PROC_ADDRESS", "-sINVOKE_RUN=1", "-sNO_EXIT_RUNTIME=1", "-sMINIFY_HTML=0", "-sASYNCIFY", "-o", "./build/itch/index.html", "-pthread", "-sALLOW_MEMORY_GROWTH",scratch_push_cstrf("-sSTACK_SIZE=%lu", MB(10)));
+  nob_cmd_append(&cmd, EMCC, WASM_FLAGS, "--preload-file", "./aseprite/atlas.png", "--preload-file", "./sprites/the_sea.png", "--preload-file", "./sounds/", target, RAYLIB_STATIC_LINK_WASM_OPTIONS, RAYLIB_STATIC_LINK_WASM_OPTIONS, "-sEXPORTED_RUNTIME_METHODS=ccall,HEAPF32", "-sUSE_GLFW=3", "-sFORCE_FILESYSTEM=1", "-sMODULARIZE=1", "-sWASM_WORKERS=1", "-sUSE_PTHREADS=1", "-sWASM=1", "-sEXPORT_ES6=1", "--shell-file", "itch_shell.html", "-sGL_ENABLE_GET_PROC_ADDRESS", "-sINVOKE_RUN=1", "-sNO_EXIT_RUNTIME=1", "-sMINIFY_HTML=0", "-sASYNCIFY", "-o", "./build/itch/index.html", "-pthread", "-sALLOW_MEMORY_GROWTH",cstrf(main_arena, "-sSTACK_SIZE=%lu", MB(10)));
   if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
 
   nob_cmd_append(&cmd, "sh", "-c", "zip ./build/itch/flight_22.zip ./build/itch/*");
@@ -676,14 +686,14 @@ int run_tags(void) {
 
 int gen_vim_project_file(void) {
   nob_log(NOB_INFO, "generating vim project file");
-  Str8 path_str = scratch_push_str8f("%S/.project.vim", project_root_path);
+  Str8 path_str = str8f(main_arena, "%S/.project.vim", project_root_path);
   ASSERT(nob_write_entire_file((char*)path_str.s, vim_project_file, memory_strlen(vim_project_file)));
   return 1;
 }
 
 int gen_nob_vim_project_file(void) {
   nob_log(NOB_INFO, "generating nob project file");
-  Str8 root_path = scratch_push_str8f("root = %S\n", os_get_current_dir());
+  Str8 root_path = str8f(main_arena, "root = %S\n", os_get_current_dir(main_arena));
 
   ASSERT(nob_write_entire_file(".project.nob", root_path.s, root_path.len));
 
@@ -721,7 +731,7 @@ int bootstrap_project(void) {
 int load_nob_project_file(void) {
   Nob_String_Builder sb = {0};
 
-  Str8 cur_dir = os_get_current_dir();
+  Str8 cur_dir = os_get_current_dir(main_arena);
 
   for(int i = 0; i < 4; i++) {
     if(!nob_read_entire_file(".project.nob", &sb)) {
@@ -730,7 +740,7 @@ int load_nob_project_file(void) {
         return 1;
       }
     } else {
-      os_set_current_dir(cur_dir);
+      os_set_current_dir(main_arena, cur_dir);
       break;
     }
   }
@@ -760,7 +770,7 @@ int load_nob_project_file(void) {
 
 int main(int argc, char **argv) {
 
-  context_init();
+  main_arena = arena_alloc(MB(4));
 
 #if 0
   {
@@ -775,7 +785,7 @@ int main(int argc, char **argv) {
 
   load_nob_project_file();
 
-  ASSERT(os_set_current_dir(project_root_path));
+  ASSERT(os_set_current_dir(main_arena, project_root_path));
 
   NOB_GO_REBUILD_URSELF(argc, argv);
 
@@ -785,11 +795,12 @@ int main(int argc, char **argv) {
   //run_metaprogram();
   run_tags();
 
+  //if(!build_meta()) return 1;
   //if(!build_release()) return 1;
   //if(!build_wasm()) return 1;
   //if(!build_itch()) return 1;
-  //if(!build_hot_reload_no_cradle()) return 1;
-  if(!build_hot_reload()) return 1;
+  if(!build_hot_reload_no_cradle()) return 1;
+  //if(!build_hot_reload()) return 1;
 
 
   return 0;

@@ -50,10 +50,8 @@ struct Sprite {
 
   Sprite_flags flags;
 
-  union {
-    s32 frame;
-    s32 first_frame;
-  };
+  s32 frame;
+  s32 first_frame;
 
   s32 last_frame;
   s32 fps;

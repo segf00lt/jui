@@ -1,12 +1,11 @@
+#include "base.h"
+
 #include "raylib.h"
 #include "raymath.h"
-#include "basic.h"
-#include "arena.h"
-#include "str.h"
+
 #include "json.h"
 #include "aseprite.h"
 #include "sprite.h"
-#include "array.h"
 
 
 #define ATLAS_IMAGE_PATH "./aseprite/atlas.png"
@@ -32,20 +31,20 @@ void print_json(JSON_value *val);
 Color color_from_hexcode(Str8 hexcode);
 
 
-Arena *scratch;
+Arena *scratch_arena;
 
 
-force_inline void print_json(JSON_value *val) {
-  Arena_scope scope = scope_begin(scratch);
-  print_json_(scratch, val, 0);
-  scope_end(scope);
+func force_inline void print_json(JSON_value *val) {
+  Arena_scope scope = arena_scope_begin(scratch_arena);
+  print_json_(scratch_arena, val, 0);
+  arena_scope_end(scope);
 }
 
-void print_json_(Arena *a, JSON_value *val, int indent) {
+func void print_json_(Arena *a, JSON_value *val, int indent) {
   char *indent_str = " ";
   int indent_factor = 4;
 
-  Arena_scope scope = scope_begin(a);
+  Arena_scope scope = arena_scope_begin(a);
   Str8 s = {0};
 
   do {
@@ -69,10 +68,10 @@ void print_json_(Arena *a, JSON_value *val, int indent) {
 
   printf("%s", s.s);
 
-  scope_end(scope);
+  arena_scope_end(scope);
 }
 
-Color color_from_hexcode(Str8 hexcode) {
+func Color color_from_hexcode(Str8 hexcode) {
   ASSERT(hexcode.s[0] == '#');
   ASSERT(hexcode.len & 0x1);
 
@@ -94,7 +93,7 @@ int main(void) {
 
   //SetTraceLogLevel(LOG_NONE);
 
-  context_init();
+  scratch_arena = arena_alloc(MB(2));
 
   JSON_parser json_parser;
 
@@ -104,20 +103,19 @@ int main(void) {
   ASSERT(!system("aseprite -b ./aseprite/*.aseprite --sheet-pack --list-tags --filename-format '{title}/{frame}' --tagname-format '{title}/{tag}' --sheet "ATLAS_IMAGE_PATH" --format json-array --data "ATLAS_METADATA_PATH));
   // new command: aseprite -b --split-layers ./aseprite/*.aseprite --sheet-pack --list-tags --filename-format '{title}/{frame}/{layer}' --all-layers --tagname-format '{title}/{tag}' --sheet test.png --format json-array --data test.json
 
-  if(!FileExists(ATLAS_METADATA_PATH)) {
+  if(!os_file_exists(ATLAS_METADATA_PATH)) {
     TraceLog(LOG_ERROR, "no "ATLAS_METADATA_PATH" was generated");
     return 1;
   }
 
-  if(!FileExists(ATLAS_IMAGE_PATH)) {
+  if(!os_file_exists(ATLAS_IMAGE_PATH)) {
     TraceLog(LOG_ERROR, "no "ATLAS_IMAGE_PATH" was generated");
     return 1;
   }
 
-  s64 src_len = 0;
-  u8 *src = LoadFileData(ATLAS_METADATA_PATH, (int*)&src_len);
+  Str8 src = os_read_entire_file(scratch_arena, ATLAS_METADATA_PATH);
 
-  json_init_parser(&json_parser, context_scratch_arena, src, src_len);
+  json_init_parser(&json_parser, scratch_arena, src.s, src.len);
   JSON_value *val = json_parse(&json_parser);
 
   if(!val) {
@@ -128,7 +126,7 @@ int main(void) {
 
   //print_json(json_parser.root);
 
-  Aseprite_atlas *atlas = scratch_push_struct(Aseprite_atlas);
+  Aseprite_atlas *atlas = push_struct(scratch_arena, Aseprite_atlas);
   JSON_value *frames = val->value;
 
   ASSERT(str8_match(str8_lit("frames"), frames->name));
@@ -138,7 +136,7 @@ int main(void) {
   TraceLog(LOG_INFO, "atlas has %li frames", frames->array_length);
 
   atlas->frames_count = frames->array_length;
-  atlas->frames = scratch_push_array(Aseprite_atlas_frame, atlas->frames_count);
+  atlas->frames = push_array(scratch_arena, Aseprite_atlas_frame, atlas->frames_count);
 
   int frame_i = 0;
   JSON_value *frame = frames->value;
@@ -157,9 +155,9 @@ int main(void) {
       if(str8_match_lit("filename", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_STRING);
 
-        Arena_scope scope = scratch_scope_begin();
+        Arena_scope scope = arena_scope_begin(scratch_arena);
 
-        Str8_list list = str8_split_by_char(context_scratch_arena, field->str, '/');
+        Str8_list list = str8_split_by_char(scratch_arena, field->str, '/');
 
         ASSERT(list.count == 2);
 
@@ -177,9 +175,9 @@ int main(void) {
           atlas_frame.frame_index += frame_index_str.s[i] - '0';
         }
 
-        scratch_scope_end(scope);
+        arena_scope_end(scope);
 
-        atlas_frame.file_title = scratch_push_str8_copy(list.first->str);
+        atlas_frame.file_title = push_str8_copy(scratch_arena, list.first->str);
 
       } else if(str8_match_lit("frame", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_OBJECT);
@@ -222,23 +220,23 @@ int main(void) {
 
       if(str8_match_lit("app", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_STRING);
-        atlas_meta.app = scratch_push_str8_copy(field->str);
+        atlas_meta.app = push_str8_copy(scratch_arena, field->str);
 
       } else if(str8_match_lit("version", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_STRING);
-        atlas_meta.version = scratch_push_str8_copy(field->str);
+        atlas_meta.version = push_str8_copy(scratch_arena, field->str);
 
       } else if(str8_match_lit("image", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_STRING);
-        atlas_meta.image = scratch_push_str8_copy(field->str);
+        atlas_meta.image = push_str8_copy(scratch_arena, field->str);
 
       } else if(str8_match_lit("format", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_STRING);
-        atlas_meta.format = scratch_push_str8_copy(field->str);
+        atlas_meta.format = push_str8_copy(scratch_arena, field->str);
 
       } else if(str8_match_lit("scale", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_STRING);
-        atlas_meta.scale = scratch_push_str8_copy(field->str);
+        atlas_meta.scale = push_str8_copy(scratch_arena, field->str);
 
       } else if(str8_match_lit("size", field->name)) {
         ASSERT(field->kind == JSON_VALUE_KIND_OBJECT);
@@ -248,7 +246,7 @@ int main(void) {
         ASSERT(field->kind == JSON_VALUE_KIND_ARRAY);
         atlas_meta.frame_tags_count = field->array_length;
         atlas_meta.frame_tags =
-          scratch_push_array(Aseprite_frame_tag, atlas_meta.frame_tags_count);
+          push_array(scratch_arena, Aseprite_frame_tag, atlas_meta.frame_tags_count);
 
         int tag_i = 0;
         JSON_value *tag = field->value;
@@ -264,9 +262,9 @@ int main(void) {
             if(str8_match_lit("name", tag_field->name)) {
               ASSERT(tag_field->kind == JSON_VALUE_KIND_STRING);
 
-              Arena_scope scope = scratch_scope_begin();
+              Arena_scope scope = arena_scope_begin(scratch_arena);
 
-              Str8_list list = str8_split_by_char(context_scratch_arena, tag_field->str, '/');
+              Str8_list list = str8_split_by_char(scratch_arena, tag_field->str, '/');
 
               ASSERT(list.count == 2);
 
@@ -280,10 +278,10 @@ int main(void) {
                 return 1;
               }
 
-              scope_end(scope);
+              arena_scope_end(scope);
 
-              atlas_tag.file_title = scratch_push_str8_copy(list.first->str);
-              atlas_tag.tag_name = scratch_push_str8_copy(list.last->str);
+              atlas_tag.file_title = push_str8_copy(scratch_arena, list.first->str);
+              atlas_tag.tag_name = push_str8_copy(scratch_arena, list.last->str);
 
             } else if(str8_match_lit("data", tag_field->name)) {
               ASSERT(tag_field->kind == JSON_VALUE_KIND_STRING);
@@ -392,7 +390,7 @@ int main(void) {
 
     Sprite_frame_slice sprite_frames =
     {
-      .d = scratch_push_array(Sprite_frame, atlas->frames_count),
+      .d = push_array(scratch_arena, Sprite_frame, atlas->frames_count),
       .count = atlas->frames_count,
     };
 
@@ -410,19 +408,19 @@ int main(void) {
     }
 
     Str8 generated_code = 
-      scratch_push_str8f(
+      push_str8f(scratch_arena, 
           "\n/////////////////////////\n"
           "/// BEGIN GENERATED\n\n");
 
     generated_code =
-      scratch_push_str8f("%S\n/* sprite frames array */\n\nconst Sprite_frame __sprite_frames[%li] =\n{\n", generated_code, sprite_frames.count);
+      push_str8f(scratch_arena, "%S\n/* sprite frames array */\n\nconst Sprite_frame __sprite_frames[%li] =\n{\n", generated_code, sprite_frames.count);
     for(int i = 0; i < sprite_frames.count; i++) {
       Sprite_frame f = sprite_frames.d[i];
       generated_code =
-        scratch_push_str8f("%S  [%i] = { .x = %u, .y = %u, .w = %u, .h = %u, },\n", generated_code, i, f.x, f.y, f.w, f.h);
+        push_str8f(scratch_arena, "%S  [%i] = { .x = %u, .y = %u, .w = %u, .h = %u, },\n", generated_code, i, f.x, f.y, f.w, f.h);
     }
     generated_code =
-      scratch_push_str8f("%S};\n\n", generated_code);
+      push_str8f(scratch_arena, "%S};\n\n", generated_code);
 
 
     Str8_list all_sprite_files = {0};
@@ -431,7 +429,7 @@ int main(void) {
       for(int i = 0; i < frames.count; i++) {
         Aseprite_atlas_frame frame = frames.d[i];
         Str8 file_title = frame.file_title;
-        str8_list_append_string(context_scratch_arena, all_sprite_files, file_title);
+        str8_list_append_str(scratch_arena, all_sprite_files, file_title);
 
         while(i+1 < frames.count) {
           Aseprite_atlas_frame frame = frames.d[i+1];
@@ -463,7 +461,7 @@ int main(void) {
         }
 
         Str8 file_title = tag.file_title;
-        str8_list_append_string(context_scratch_arena, sprite_files_with_frame_tags, file_title);
+        str8_list_append_str(scratch_arena, sprite_files_with_frame_tags, file_title);
 
         while(i+1 < frame_tags_count) {
           Aseprite_frame_tag tag = frame_tags[i+1];
@@ -540,7 +538,7 @@ int main(void) {
           for(int i = 0; i < ARRLEN(visited_frames); i++) {
             if(!visited_frames[i]) {
               there_are_untagged_frames = 1;
-              untagged_frames_list_str = scratch_push_str8f("%S  %i", untagged_frames_list_str, i);
+              untagged_frames_list_str = push_str8f(scratch_arena, "%S  %i", untagged_frames_list_str, i);
             }
           }
 
@@ -557,7 +555,7 @@ int main(void) {
 
 
     Arr(File_frame_range) file_frame_ranges;
-    arr_init(file_frame_ranges, context_scratch_arena);
+    arr_init(file_frame_ranges, scratch_arena);
 
     for(int i = 0; i < atlas->frames_count; i++) {
       Aseprite_atlas_frame frame = atlas->frames[i];
@@ -573,13 +571,13 @@ int main(void) {
     { /* generate keyframes */
 
       generated_code =
-        scratch_push_str8f(
+        push_str8f(scratch_arena, 
             "%S\n/* keyframes */\n\n", generated_code);
 
       Aseprite_frame_tag *frame_tags = atlas->meta.frame_tags;
       s64 frame_tags_count = atlas->meta.frame_tags_count;
 
-      Arena_scope scope = scratch_scope_begin();
+      Arena_scope scope = arena_scope_begin(scratch_arena);
       Str8 keyframes_code = {0};
 
       for(int i = 0; i < frame_tags_count; i++) {
@@ -602,25 +600,25 @@ int main(void) {
         abs_frame_index += tag.from;
 
         keyframes_code =
-          scratch_push_str8f(
+          push_str8f(scratch_arena, 
               "%Sconst s32 SPRITE_KEYFRAME_%S_%S = %li;\n",
-              keyframes_code, str8_to_upper(context_scratch_arena, tag.file_title), str8_to_upper(context_scratch_arena, tag.tag_name), abs_frame_index);
+              keyframes_code, str8_to_upper(scratch_arena, tag.file_title), str8_to_upper(scratch_arena, tag.tag_name), abs_frame_index);
 
       }
 
-      scratch_scope_end(scope);
-      keyframes_code = scratch_push_str8_copy(keyframes_code);
-      generated_code = scratch_push_str8f("%S%S", generated_code, keyframes_code);
+      arena_scope_end(scope);
+      keyframes_code = push_str8_copy(scratch_arena, keyframes_code);
+      generated_code = push_str8f(scratch_arena, "%S%S", generated_code, keyframes_code);
 
     } /* generate keyframes */
 
     { /* generate sprites */
 
       generated_code =
-        scratch_push_str8f(
+        push_str8f(scratch_arena, 
             "%S\n\n/* sprites */\n\n", generated_code);
 
-      Arena_scope scope = scope_begin(context_scratch_arena);
+      Arena_scope scope = arena_scope_begin(scratch_arena);
       Str8 sprites_code = {0};
 
       u32 sprite_id = 0;
@@ -645,9 +643,9 @@ int main(void) {
 
         if(tag.to == tag.from) {
           sprites_code =
-            scratch_push_str8f(
+            push_str8f(scratch_arena, 
                 "%Sconst Sprite SPRITE_%S_%S = { .id = %u, .flags = SPRITE_FLAG_STILL, .first_frame = %li, .last_frame = %li, .total_frames = 1 };\n",
-                sprites_code, str8_to_upper(context_scratch_arena, tag.file_title), str8_to_upper(context_scratch_arena, tag.tag_name), sprite_id++, tag_first_frame, tag_last_frame);
+                sprites_code, str8_to_upper(scratch_arena, tag.file_title), str8_to_upper(scratch_arena, tag.tag_name), sprite_id++, tag_first_frame, tag_last_frame);
         } else {
           s64 fps = 1000/atlas->frames[range.first_frame].duration;
 
@@ -673,13 +671,13 @@ int main(void) {
           }
 
           if(tag.n_repeats == 0) {
-            flags_str = scratch_push_str8f("%S | SPRITE_FLAG_INFINITE_REPEAT", flags_str);
+            flags_str = push_str8f(scratch_arena, "%S | SPRITE_FLAG_INFINITE_REPEAT", flags_str);
           }
 
           sprites_code =
-            scratch_push_str8f(
+            push_str8f(scratch_arena, 
                 "%Sconst Sprite SPRITE_%S_%S = { .id = %u, .flags = %S, .first_frame = %li, .last_frame = %li, .fps = %li, .total_frames = %li };\n",
-                sprites_code, str8_to_upper(context_scratch_arena, tag.file_title), str8_to_upper(context_scratch_arena, tag.tag_name), sprite_id++, flags_str, tag_first_frame, tag_last_frame, fps, tag_last_frame - tag_first_frame + 1);
+                sprites_code, str8_to_upper(scratch_arena, tag.file_title), str8_to_upper(scratch_arena, tag.tag_name), sprite_id++, flags_str, tag_first_frame, tag_last_frame, fps, tag_last_frame - tag_first_frame + 1);
         }
 
       }
@@ -700,9 +698,9 @@ int main(void) {
 
         if(range.first_frame == range.last_frame) {
           sprites_code =
-            scratch_push_str8f(
+            push_str8f(scratch_arena, 
                 "%Sconst Sprite SPRITE_%S = { .id = %u, .flags = SPRITE_FLAG_STILL, .first_frame = %li, .last_frame = %li, .total_frames = 1 };\n",
-                sprites_code, str8_to_upper(context_scratch_arena, range.file_title), sprite_id++, range.first_frame, range.last_frame);
+                sprites_code, str8_to_upper(scratch_arena, range.file_title), sprite_id++, range.first_frame, range.last_frame);
         } else {
 
           for(s64 fi = range.first_frame; fi < range.last_frame; fi++) {
@@ -716,21 +714,21 @@ int main(void) {
           s64 fps = 1000/atlas->frames[range.first_frame].duration;
 
           sprites_code =
-            scratch_push_str8f(
+            push_str8f(scratch_arena, 
                 "%Sconst Sprite SPRITE_%S = { .id = %u, .flags = SPRITE_FLAG_INFINITE_REPEAT, .first_frame = %li, .last_frame = %li, .fps = %li, .total_frames = %li };\n",
-                sprites_code, str8_to_upper(context_scratch_arena, range.file_title), sprite_id++, range.first_frame, range.last_frame, fps, range.last_frame - range.first_frame + 1);
+                sprites_code, str8_to_upper(scratch_arena, range.file_title), sprite_id++, range.first_frame, range.last_frame, fps, range.last_frame - range.first_frame + 1);
         }
 
       }
 
-      scope_end(scope);
-      sprites_code = scratch_push_str8_copy(sprites_code);
-      generated_code = scratch_push_str8f("%S%S", generated_code, sprites_code);
+      arena_scope_end(scope);
+      sprites_code = push_str8_copy(scratch_arena, sprites_code);
+      generated_code = push_str8f(scratch_arena, "%S%S", generated_code, sprites_code);
 
     } /* generate sprites */
 
     generated_code =
-      scratch_push_str8f(
+      push_str8f(scratch_arena, 
           "%S\n\n/////////////////////////\n"
           "/// END GENERATED\n\n", generated_code);
 
@@ -738,14 +736,14 @@ int main(void) {
 
   } /* generate sprites from aseprite atlas */
 
-  scratch_clear();
+  arena_clear(scratch_arena);
 
 #if 0
   { /* convert .mp3 to C source */
 
     TraceLog(LOG_INFO, "packaging sounds");
 
-    Str8 code = scratch_push_str8f(
+    Str8 code = push_str8f(scratch_arena, 
         "/////////////////////////////\n"
         "/// BEGIN GENERATED\n\n"
         );
@@ -814,7 +812,7 @@ int main(void) {
       }
     }
 
-    Str8 code = scratch_push_str8f(
+    Str8 code = push_str8f(scratch_arena, 
         "////////////////////////\n"
         "/// BEGIN GENERATED\n\n"
         "const u32 _particle_frame_count = %i;\n\n"
@@ -824,13 +822,13 @@ int main(void) {
     for(int i = 0; i < rows; i++) {
       for(int j = 0; j < cols; j++) {
         code =
-          scratch_push_str8f("%S  { .x = %i, .y = %i, .width = %i, .height = %i },\n", 
+          push_str8f(scratch_arena, "%S  { .x = %i, .y = %i, .width = %i, .height = %i },\n", 
               code,
               j*particle_frame_size, i*particle_frame_size, particle_frame_size, particle_frame_size);
       }
     }
 
-    code = scratch_push_str8f(
+    code = push_str8f(scratch_arena, 
         "%S};\n\n"
         "////////////////////////\n"
         "/// END GENERATED\n\n", code);
@@ -844,8 +842,6 @@ int main(void) {
   } /* generate random particle textures */
 #endif
 
-
-  UnloadFileData(src);
 
   return 0;
 }

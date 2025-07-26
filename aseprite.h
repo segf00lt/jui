@@ -88,7 +88,7 @@ Vector2 aseprite_vector2_wh_from_json_object(JSON_value *v);
 #ifdef ASEPRITE_ATLAS_IMPL
 
 
-Rectangle aseprite_rectangle_from_json_object(JSON_value *v) {
+func Rectangle aseprite_rectangle_from_json_object(JSON_value *v) {
   Rectangle result = {0};
 
   JSON_value *field = v->value;
@@ -110,7 +110,7 @@ Rectangle aseprite_rectangle_from_json_object(JSON_value *v) {
   return result;
 }
 
-Vector2 aseprite_vector2_wh_from_json_object(JSON_value *v) {
+func Vector2 aseprite_vector2_wh_from_json_object(JSON_value *v) {
   Vector2 result = {0};
   JSON_value *field = v->value;
 
@@ -128,7 +128,7 @@ Vector2 aseprite_vector2_wh_from_json_object(JSON_value *v) {
 
 }
 
-Vector2 aseprite_vector2_from_json_object(JSON_value *v) {
+func Vector2 aseprite_vector2_from_json_object(JSON_value *v) {
   Vector2 result = {0};
 
   JSON_value *field = v->value;

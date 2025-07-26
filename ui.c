@@ -74,35 +74,42 @@
 
 
 #define UI_STYLE_PROPERTIES \
-  /* upper                camel              lower                type              init                                stack_size */ \
-  X( BACKGROUND_COLOR,    BackgroundColor,   background_color,    Color,            ((Color){ 110, 110, 110, 255 }),    8           ) \
-  X( TEXT_COLOR,          TextColor,         text_color,          Color,            ((Color){ 248, 248, 248, 255 }),    8           ) \
-  X( BORDER_COLOR,        BorderColor,       border_color,        Color,            ((Color){ 180, 180, 180, 255 }),    8           ) \
-  X( BORDER_SIZE,         BorderSize,        border_size,         f32,              ((f32)1.0f),                        8           ) \
-  X( CORNER_RADIUS_0,     CornerRadius0,     corner_radius_0,     f32,              ((f32)0.0f),                        8           ) \
-  X( CORNER_RADIUS_1,     CornerRadius1,     corner_radius_1,     f32,              ((f32)0.0f),                        8           ) \
-  X( CORNER_RADIUS_2,     CornerRadius2,     corner_radius_2,     f32,              ((f32)0.0f),                        8           ) \
-  X( CORNER_RADIUS_3,     CornerRadius3,     corner_radius_3,     f32,              ((f32)0.0f),                        8           ) \
-  X( FONT_ID,             FontId,            font_id,             u32,              ((u32)0),                           4           ) \
-  X( FONT_SIZE,           FontSize,          font_size,           f32,              ((f32)10.0f),                       8           ) \
-  X( FONT_SPACING,        FontSpacing,       font_spacing,        f32,              ((f32)1.0f),                        4           ) \
-  X( TEXT_ALIGN,          TextAlign,         text_align,          UI_text_align,    UI_TEXT_ALIGN_LEFT,                 16          ) \
-  X( SEMANTIC_WIDTH,      SemanticWidth,     semantic_width,      UI_size,          ((UI_size){0}),                     16          ) \
-  X( SEMANTIC_HEIGHT,     SemanticHeight,    semantic_height,     UI_size,          ((UI_size){0}),                     16          ) \
-  X( MIN_WIDTH,           MinWidth,          min_width,           f32,              ((f32)0),                           4           ) \
-  X( MIN_HEIGHT,          MinHeight,         min_height,          f32,              ((f32)0),                           4           ) \
-  X( FIXED_WIDTH,         FixedWidth,        fixed_width,         f32,              ((f32)0),                           4           ) \
-  X( FIXED_HEIGHT,        FixedHeight,       fixed_height,        f32,              ((f32)0),                           4           ) \
-  X( PADDING,             Padding,           padding,             f32,              ((f32)2.0f),                        8           ) \
-  X( CHILD_LAYOUT_AXIS,   ChildLayoutAxis,   child_layout_axis,   UI_axis,          ((UI_axis)0),                       64          ) \
+  /* lower               lower_alt             type              init                                stack_size */ \
+  X( background_color,   background_color,     Color,            ((Color){ 110, 110, 110, 255 }),    8           ) \
+  X( text_color,         text_color,           Color,            ((Color){ 248, 248, 248, 255 }),    8           ) \
+  X( border_color,       border_color,         Color,            ((Color){ 180, 180, 180, 255 }),    8           ) \
+  X( border_size,        border_size,          f32,              ((f32)1.0f),                        8           ) \
+  X( corner_radius_0,    corner_radius[0],     f32,              ((f32)0.0f),                        8           ) \
+  X( corner_radius_1,    corner_radius[1],     f32,              ((f32)0.0f),                        8           ) \
+  X( corner_radius_2,    corner_radius[2],     f32,              ((f32)0.0f),                        8           ) \
+  X( corner_radius_3,    corner_radius[3],     f32,              ((f32)0.0f),                        8           ) \
+  X( font_id,            font_id,              u32,              ((u32)0),                           4           ) \
+  X( font_size,          font_size,            f32,              ((f32)10.0f),                       8           ) \
+  X( font_spacing,       font_spacing,         f32,              ((f32)1.0f),                        4           ) \
+  X( text_align,         text_align,           UI_text_align,    UI_TEXT_ALIGN_LEFT,                 16          ) \
+  X( semantic_width,     semantic_size[0],     UI_size,          ((UI_size){0}),                     16          ) \
+  X( semantic_height,    semantic_size[1],     UI_size,          ((UI_size){0}),                     16          ) \
+  X( padding,            padding,              f32,              ((f32)2.0f),                        8           ) \
+  X( child_layout_axis,  child_layout_axis,    UI_axis,          ((UI_axis)0),                       64          ) \
+
+#define UI_SIZE_PROPERTIES \
+  /* lower           lower_alt         type              init                                stack_size */ \
+  X( min_width,      min_size[0],      f32,              ((f32)0),                           4           ) \
+  X( min_height,     min_size[1],      f32,              ((f32)0),                           4           ) \
+  X( fixed_width,    fixed_size[0],    f32,              ((f32)0),                           4           ) \
+  X( fixed_height,   fixed_size[1],    f32,              ((f32)0),                           4           ) \
+
+#define UI_OTHER_PROPERTIES \
+  /* lower            lower_alt                  type              init                      stack_size */ \
+  X( parent,          parent,                    UI_box_ptr,       nil_ui_box,               16          ) \
+  X( flags,           flags,                     UI_box_flag,      0,                        16          ) \
+  X( floating_position,  floating_position,         Vector2,          ((Vector2){0}),           4           ) \
+  X( exclude_flags,   exclude_flags,             UI_box_flag,      0,                        16          ) \
 
 #define UI_PROPERTIES \
-  /* upper                camel              lower                type              init                                stack_size */ \
   UI_STYLE_PROPERTIES \
-  X( PARENT,              Parent,            parent,              UI_box_ptr,       nil_ui_box,                         16          ) \
-  X( FLAGS,               Flags,             flags,               UI_box_flag,      0,                                  16          ) \
-  X( FIXED_POSITION,      FixedPosition,     fixed_position,      Vector2,          ((Vector2){0}),                     4           ) \
-  X( EXCLUDE_FLAGS,       ExcludeFlags,      exclude_flags,       UI_box_flag,      0,                                  16          ) \
+  UI_SIZE_PROPERTIES \
+  UI_OTHER_PROPERTIES \
 
 #define ui_background_color(value) ui_prop(background_color, (value))
 
@@ -129,7 +136,7 @@
 
 #define ui_padding(value) ui_prop(padding, (value))
 
-#define ui_fixed_position(value) ui_prop(fixed_position, (value))
+#define ui_floating_position(value) ui_prop(floating_position, (value))
 
 #define ui_child_layout_axis(value) ui_prop(child_layout_axis, (value))
 
@@ -314,63 +321,31 @@ struct UI_box {
   Color text_color;
   Color border_color;
   f32 border_size;
-  union {
-    struct {
-      f32 corner_radius_0;
-      f32 corner_radius_1;
-      f32 corner_radius_2;
-      f32 corner_radius_3;
-    };
-    f32 corner_radius[4];
-  };
+  f32 corner_radius[4];
   u32 font_id;
   f32 font_size;
   f32 font_spacing;
   UI_text_align text_align;
-  union {
-    struct {
-      UI_size semantic_width;
-      UI_size semantic_height;
-    };
-    UI_size semantic_size[UI_AXIS_COUNT];
-  };
+  UI_size semantic_size[UI_AXIS_COUNT];
   f32 padding;
   Vector2 floating_position;
   UI_axis child_layout_axis;
 
   Str8 text;
 
-  union {
-    struct {
-      f32 min_width;
-      f32 min_height;
-    };
-    f32 min_size[2];
-  };
-
-  union {
-    struct {
-      f32 fixed_width;
-      f32 fixed_height;
-    };
-    f32 fixed_size[2];
-  };
-
-  f32 fixed_rel_pos[2];
-  union {
-    Vector2 fixed_position;
-    struct {
-      f32 min[2];
-      f32 max[2];
-    } final_rect;
-  };
-
+  f32 min_size[2];
+  f32 max_size[2];
+  f32 fixed_size[2];
+  f32 computed_rel_pos[2];
+  f32 final_rect_min[2];
+  f32 final_rect_max[2];
 
   u64 first_visited_build_index;
   u64 last_visited_build_index;
   f32 view_offset[2];
   f32 view_offset_target[2];
   f32 view_bounds[2];
+
   f32 hot_time;
   f32 active_time;
 };
@@ -378,17 +353,7 @@ struct UI_box {
 struct UI_signal {
   UI_signal_flag flags;
   UI_box *box;
-  union {
-    struct {
-      s16 scroll_x;
-      s16 scroll_y;
-    };
-    struct {
-      s16 scroll_0;
-      s16 scroll_1;
-    };
-    s16 scroll[2];
-  };
+  s16 scroll[2];
   UI_modifier_keys_mask modifier_keys;
 };
 
@@ -436,14 +401,14 @@ struct UI_context {
 
   UI_key active_box_key[UI_MOUSE_BUTTON_COUNT];
   UI_key hot_box_key;
-
-#define X(upper, camel, lower, type, init, stack_size) UI_ARR_PREFIX##type lower##_stack;
-  struct {
-    UI_PROPERTIES
-  };
-#undef X
+  UI_key drop_hot_box_key;
 
   UI_box *box_free_list;
+
+#define X(lower, lower_alt, type, init, stack_size) UI_ARR_PREFIX##type lower##_stack;
+  UI_PROPERTIES
+#undef X
+
 };
 
 /*
@@ -481,6 +446,7 @@ void ui_draw(UI_context *ui);
 void ui_get_input(UI_context *ui);
 
 UI_key ui_hot_box_key(UI_context *ui);
+UI_key ui_drop_hot_box_key(UI_context *ui);
 UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn);
 
 /*
@@ -520,18 +486,18 @@ f32 ui_prof_time_to_calc_positions;
  * function bodies
  */
 
-UI_context* ui_init(void) {
+func UI_context* ui_init(void) {
   
   UI_context *ui = os_alloc(sizeof(UI_context));
 
   memory_zero(ui, sizeof(UI_context));
 
-  ui->arena       = arena_alloc(.size = MB(1));
-  ui->temp        = arena_alloc(.size = KB(8));
-  ui->build_arena = arena_alloc(.size = KB(16));
-  ui->draw_arena  = arena_alloc(.size = KB(16));
+  ui->arena       = arena_alloc(MB(1));
+  ui->temp        = arena_alloc(KB(8));
+  ui->build_arena = arena_alloc(KB(16));
+  ui->draw_arena  = arena_alloc(KB(16));
 
-#define X(upper, camel, lower, type, init, stack_size) \
+#define X(lower, lower_alt, type, init, stack_size) \
   arr_init_ex(ui->lower##_stack, ui->arena, stack_size);
   UI_PROPERTIES;
 #undef X
@@ -543,7 +509,7 @@ UI_context* ui_init(void) {
   return ui;
 }
 
-void ui_close(UI_context *ui) {
+func void ui_close(UI_context *ui) {
   arena_free(ui->arena);
   arena_free(ui->build_arena);
   arena_free(ui->temp);
@@ -551,11 +517,11 @@ void ui_close(UI_context *ui) {
   os_free(ui);
 }
 
-force_inline UI_key ui_key_nil(void) {
+func UI_key ui_key_nil(void) {
   return (UI_key){0};
 }
 
-UI_key ui_key_from_str(Str8 str) {
+func UI_key ui_key_from_str(Str8 str) {
 
   UI_key key = { .hash = 0, .src_str = str };
 
@@ -568,7 +534,7 @@ UI_key ui_key_from_str(Str8 str) {
   return key;
 }
 
-b32 ui_key_match(UI_key a, UI_key b) {
+func b32 ui_key_match(UI_key a, UI_key b) {
   b32 match = 1;
 
   if(a.hash != b.hash) {
@@ -582,7 +548,7 @@ b32 ui_key_match(UI_key a, UI_key b) {
   return match;
 }
 
-UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
+func UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
   UI_box *result = 0;
 
   if(!ui_key_match(key, ui_key_nil())) {
@@ -600,25 +566,29 @@ UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
   return result;
 }
 
-UI_box* ui_get_box_from_str(UI_context *ui, Str8 s) {
+func UI_box* ui_get_box_from_str(UI_context *ui, Str8 s) {
   return ui_get_box_from_key(ui, ui_key_from_str(s));
 }
 
-force_inline UI_key ui_hot_box_key(UI_context *ui) {
+func UI_key ui_hot_box_key(UI_context *ui) {
   return ui->hot_box_key;
 }
 
-force_inline UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn) {
+func UI_key ui_drop_hot_box_key(UI_context *ui) {
+  return ui->drop_hot_box_key;
+}
+
+func UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn) {
   return ui->active_box_key[btn];
 }
 
-UI_box* ui_make_transient_box(UI_context *ui) {
+func UI_box* ui_make_transient_box(UI_context *ui) {
   return ui_make_box_from_key(ui, 0, ((UI_key){0}));
 }
 
-UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key) {
+func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key) {
 
-#define X(upper, camel, lower, type, init, stack_size) type cur_##lower = arr_last(ui->lower##_stack);
+#define X(lower, lower_alt, type, init, stack_size) type cur_##lower = arr_last(ui->lower##_stack);
   UI_PROPERTIES;
 #undef X
 
@@ -649,8 +619,8 @@ UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key) {
 
   if(is_box_first_frame && !box_is_transient) {
     box->first_visited_build_index = ui->build_index;
-    u64 slot = key.hash % ARRLEN(ui->box_table);
-    dll_push_back(ui->box_table[slot].first, ui->box_table[slot].last, box);
+    u64 slot = key.hash % MAX_TABLE_SLOTS;
+    dll_push_back_np(ui->box_table[slot].first, ui->box_table[slot].last, box, hash_next, hash_prev);
   }
 
   if(cur_parent) {
@@ -662,16 +632,33 @@ UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key) {
   box->key = key;
   box->last_visited_build_index = ui->build_index;
 
-#define X(upper, camel, lower, type, init, stack_size) box->lower = cur_##lower;
-  UI_PROPERTIES;
+#define X(lower, lower_alt, type, init, stack_size) memory_copy(&box->lower_alt, &cur_##lower, sizeof(cur_##lower));
+  UI_STYLE_PROPERTIES;
+  UI_OTHER_PROPERTIES;
 #undef X
+
+  if(ui->fixed_width_stack.count > 0) {
+    box->fixed_size[0] = cur_fixed_width;
+  }
+
+  if(ui->fixed_height_stack.count > 0) {
+    box->fixed_size[1] = cur_fixed_height;
+  }
+
+  if(ui->min_width_stack.count > 0) {
+    box->min_size[0] = cur_min_width;
+  }
+
+  if(ui->min_height_stack.count > 0) {
+    box->min_size[1] = cur_min_height;
+  }
 
   box->flags |= flags;
 
   return box;
 }
 
-Str8 ui_strip_id_from_text(Str8 text) {
+func Str8 ui_strip_id_from_text(Str8 text) {
   s64 index = str8_find(text, str8_lit("##"));
   if(index >= 0) {
     text.len = index;
@@ -679,7 +666,7 @@ Str8 ui_strip_id_from_text(Str8 text) {
   return text;
 }
 
-UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str) {
+func UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str) {
   UI_key key = ui_key_from_str(str);
 
   UI_box *box = ui_make_box_from_key(ui, flags, key);
@@ -691,26 +678,26 @@ UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str) {
   return box;
 }
 
-UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...) {
-  Arena_scope scope = scope_begin(ui->temp);
+func UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...) {
+  UI_box *box = NULL;
 
-  va_list args;
-  va_start(args, fmt);
-  Str8 str = push_str8fv(ui->temp, fmt, args);
-  va_end(args);
+  arena_scope(ui->temp) {
+    va_list args;
+    va_start(args, fmt);
+    Str8 str = str8fv(ui->temp, fmt, args);
+    va_end(args);
 
-  UI_box *box = ui_make_box_from_str(ui, flags, str);
-
-  scope_end(scope);
+    box = ui_make_box_from_str(ui, flags, str);
+  }
 
   return box;
 }
 
-force_inline Vector2 ui_drag_delta(UI_context *ui) {
+func Vector2 ui_drag_delta(UI_context *ui) {
   return Vector2Subtract(ui->mouse_pos, ui->drag_start_pos);
 }
 
-UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
+func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
   b32 taken = 0;
 
   UI_signal sig = { .box = box };
@@ -719,22 +706,22 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
 
   Rectangle box_rec =
   {
-    .x = box->final_rect.min[0],
-    .y = box->final_rect.min[1],
-    .width =  box->final_rect.max[0] - box->final_rect.min[0],
-    .height = box->final_rect.max[1] - box->final_rect.min[1],
+    .x = box->final_rect_min[0],
+    .y = box->final_rect_min[1],
+    .width =  box->final_rect_max[0] - box->final_rect_min[0],
+    .height = box->final_rect_max[1] - box->final_rect_min[1],
   };
 
   for(UI_box *parent = box->parent; parent; parent = parent->parent) {
     if(parent->flags & UI_BOX_FLAG_CLIP) {
       Rectangle clip_rec =
       {
-        .x = parent->final_rect.min[0], .y = parent->final_rect.min[1],
-        .width = parent->final_rect.max[0] - parent->final_rect.min[0],
-        .height = parent->final_rect.max[1] - parent->final_rect.min[1],
+        .x = parent->final_rect_min[0], .y = parent->final_rect_min[1],
+        .width = parent->final_rect_max[0] - parent->final_rect_min[0],
+        .height = parent->final_rect_max[1] - parent->final_rect_min[1],
       };
 
-      box_rec = GetCollisionRec(box_rec, clip_rec);
+      box_rec = GetCollisionRec(clip_rec, box_rec);
     }
   }
 
@@ -748,8 +735,6 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     {
       sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
       ui->hot_box_key = box->key;
-    } else {
-      ui->hot_box_key = ui_key_nil();
     }
 
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
@@ -767,7 +752,8 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
         (ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE) &&
         btn_on &&
-        ui_key_match(ui_active_box_key(ui, btn), box->key) &&
+        //ui_key_match(ui_active_box_key(ui, btn), box->key) &&
+        ui_key_match(ui_hot_box_key(ui), box->key) &&
         mouse_in_bounds
       )
     {
@@ -800,6 +786,21 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG << btn);
     }
 
+  }
+
+  if(box->flags & UI_BOX_FLAG_DROP_SITE &&
+      mouse_in_bounds &&
+      (ui_key_match(ui->drop_hot_box_key, ui_key_nil()) || ui_key_match(ui->drop_hot_box_key, box->key)))
+  {
+    ui->drop_hot_box_key = box->key;
+  }
+
+
+  if(box->flags & UI_BOX_FLAG_DROP_SITE &&
+      !mouse_in_bounds &&
+      ui_key_match(ui->drop_hot_box_key, box->key))
+  {
+    ui->drop_hot_box_key = ui_key_nil();
   }
 
   if((box->flags & UI_BOX_FLAG_SCROLL) &&
@@ -866,7 +867,7 @@ UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
   return sig;
 }
 
-void ui_get_input(UI_context *ui) {
+func void ui_get_input(UI_context *ui) {
   ui->took_input_event = 0;
   ui->input_flags = 0;
   ui->mouse_buttons_active = 0;
@@ -916,7 +917,7 @@ void ui_get_input(UI_context *ui) {
 
 }
 
-void ui_begin_build(UI_context *ui) {
+func void ui_begin_build(UI_context *ui) {
   arena_clear(ui->build_arena);
 
   ui->build_index++;
@@ -936,10 +937,13 @@ void ui_begin_build(UI_context *ui) {
 
   ui_get_input(ui);
 
+  ui->hot_box_key = ui_key_nil(); // TODO make sure this is correct
+  ui->drop_hot_box_key = ui_key_nil();
+
 }
 
 // TODO make an iterative version of this
-f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
+func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
   f32 sum = 0;
 
   if(box->first) {
@@ -979,22 +983,24 @@ f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
   return sum;
 }
 
-void ui_end_build(UI_context *ui) {
+func void ui_end_build(UI_context *ui) {
 
   // TODO why not just clear all the stacks??
-#define X(upper, camel, lower, type, init, stack_size) ui_clear_prop(lower);
+#define X(lower, lower_alt, type, init, stack_size) ui_clear_prop(lower);
   UI_PROPERTIES;
 #undef X
 
   /* prune box tree */
-  for(u64 table_i = 0; table_i < ARRLEN(ui->box_table); table_i++) {
+  for(u64 table_i = 0; table_i < MAX_TABLE_SLOTS; table_i++) {
     UI_box *box = ui->box_table[table_i].first;
     for(; box; box = box->hash_next) {
       if(box->last_visited_build_index < ui->build_index || ui_key_match(box->key, ui_key_nil())) {
-        dll_remove(
+        dll_remove_np(
             ui->box_table[table_i].first,
             ui->box_table[table_i].last,
-            box);
+            box,
+            hash_next,
+            hash_prev);
         sll_stack_push(ui->box_free_list, box);
       }
     }
@@ -1017,13 +1023,12 @@ void ui_end_build(UI_context *ui) {
                 node->fixed_size[axis] = size.value;
               } break;
             case UI_SIZE_TEXT_CONTENT:
-              {
-                Arena_scope scope = scope_begin(ui->build_arena);
+              arena_scope(ui->build_arena) {
 
                 Vector2 text_size =
                   MeasureTextEx(
                       ui->fonts[node->font_id],
-                      push_cstr_copy_str8(ui->build_arena, node->text),
+                      cstr_copy_str8(ui->build_arena, node->text),
                       node->font_size,
                       node->font_spacing);
 
@@ -1033,7 +1038,6 @@ void ui_end_build(UI_context *ui) {
 
                 node->fixed_size[axis] = text_size_on_axis + padding;
 
-                scope_end(scope);
               } break;
           }
 
@@ -1121,8 +1125,7 @@ void ui_end_build(UI_context *ui) {
 
             f32 violation = total_size - total_allowed_size;
             
-            Arena_scope tmp_scope;
-            if(violation > 0 && total_weighted_size > 0) defer_loop(tmp_scope = scope_begin(ui->build_arena), scope_end(tmp_scope))
+            if(violation > 0 && total_weighted_size > 0) arena_scope(ui->build_arena)
             {
               f32 *child_fixups = push_array(ui->build_arena, f32, node->child_count);
 
@@ -1193,35 +1196,38 @@ void ui_end_build(UI_context *ui) {
       f32 final_layout_axis_min = 0.0f;
       f32 final_axis_min = 0.0f;
       if(node->flags & UI_BOX_FLAG_IS_FLOATING) {
-        final_layout_axis_min = (&(node->fixed_position.x))[layout_axis];
-        final_axis_min = (&(node->fixed_position.x))[axis];
+        final_layout_axis_min = (&(node->floating_position.x))[layout_axis];
+        final_axis_min = (&(node->floating_position.x))[axis];
       } else {
 
         f32 parent_layout_axis_pos = 0.0f;
         f32 parent_axis_pos = 0.0f;
         if(parent) {
-          parent_layout_axis_pos = parent->final_rect.min[layout_axis];
-          parent_axis_pos = parent->final_rect.min[axis];
+          parent_layout_axis_pos = parent->final_rect_min[layout_axis];
+          parent_axis_pos = parent->final_rect_min[axis];
         }
 
         f32 rel_layout_axis_pos = 0.0f;
         if(node->prev) {
-          rel_layout_axis_pos = node->prev->fixed_rel_pos[layout_axis] + node->prev->fixed_size[layout_axis];
+          rel_layout_axis_pos = node->prev->computed_rel_pos[layout_axis] + node->prev->fixed_size[layout_axis];
         }
 
-        node->fixed_rel_pos[layout_axis] = rel_layout_axis_pos;
+        node->computed_rel_pos[layout_axis] = rel_layout_axis_pos;
 
         final_layout_axis_min = parent_layout_axis_pos + rel_layout_axis_pos;
         final_axis_min = parent_axis_pos;
       }
 
-      node->final_rect.min[layout_axis] = final_layout_axis_min;
-      node->final_rect.min[axis] = final_axis_min;
-      node->final_rect.max[layout_axis] = final_layout_axis_min + node->fixed_size[layout_axis];
-      node->final_rect.max[axis] = final_axis_min + node->fixed_size[axis];
+      node->final_rect_min[layout_axis] = final_layout_axis_min;
+      node->final_rect_min[axis] = final_axis_min;
+      node->final_rect_max[layout_axis] = final_layout_axis_min + node->fixed_size[layout_axis];
+      node->final_rect_max[axis] = final_axis_min + node->fixed_size[axis];
 
       node->view_bounds[layout_axis] = node->fixed_size[layout_axis];
       node->view_bounds[axis] = node->fixed_size[axis];
+
+      node->floating_position.x = node->final_rect_min[0];
+      node->floating_position.y = node->final_rect_min[1];
 
       if(node->first) {
         node = node->first;
@@ -1238,11 +1244,9 @@ void ui_end_build(UI_context *ui) {
 
   } /* calculate the relative and then absolute positions of each box in pre order */
 
-
-
 }
 
-UI_box_node* ui_push_box_node(UI_context *ui) {
+func UI_box_node* ui_push_box_node(UI_context *ui) {
   UI_box_node *node = 0;
 
   node = push_struct(ui->draw_arena, UI_box_node);
@@ -1250,7 +1254,7 @@ UI_box_node* ui_push_box_node(UI_context *ui) {
   return node;
 }
 
-void dump_UI_box(const UI_box *box) {
+func void dump_UI_box(const UI_box *box) {
     printf("UI_box {\n");
 
     printf("  flags = 0x%lX\n", box->flags);
@@ -1302,12 +1306,12 @@ void dump_UI_box(const UI_box *box) {
     printf("  fixed_size = [%.2f, %.2f]\n",
            box->fixed_size[0], box->fixed_size[1]);
     printf("  fixed_rel_pos = [%.2f, %.2f]\n",
-           box->fixed_rel_pos[0], box->fixed_rel_pos[1]);
+           box->computed_rel_pos[0], box->computed_rel_pos[1]);
 
     printf("  final_rect.min = [%.2f, %.2f]\n",
-           box->final_rect.min[0], box->final_rect.min[1]);
+           box->final_rect_min[0], box->final_rect_min[1]);
     printf("  final_rect.max = [%.2f, %.2f]\n",
-           box->final_rect.max[0], box->final_rect.max[1]);
+           box->final_rect_max[0], box->final_rect_max[1]);
 
     printf("  first_visited_build_index = %llu\n",
            (unsigned long long)box->first_visited_build_index);
@@ -1327,46 +1331,47 @@ void dump_UI_box(const UI_box *box) {
     printf("}\n");
 }
 
-void ui_draw(UI_context *ui) {
+func void ui_draw(UI_context *ui) {
 
   for(UI_box *box = ui->root; box;) {
 
+    //TraceLog(LOG_DEBUG, "drawing %s", cstrf(ui->temp, "'%S' %li", box->key.src_str, box->key.hash));
+
     Rectangle rec =
     {
-      .x = box->final_rect.min[0],
-      .y = box->final_rect.min[1],
-      .width =  box->final_rect.max[0] - box->final_rect.min[0],
-      .height = box->final_rect.max[1] - box->final_rect.min[1],
+      .x = box->final_rect_min[0],
+      .y = box->final_rect_min[1],
+      .width =  box->final_rect_max[0] - box->final_rect_min[0],
+      .height = box->final_rect_max[1] - box->final_rect_min[1],
     };
 
     if(box->flags & UI_BOX_FLAG_DRAW_BACKGROUND) {
       DrawRectangleRoundedPro(rec,
-          box->corner_radius_0,
-          box->corner_radius_1,
-          box->corner_radius_2,
-          box->corner_radius_3,
+          box->corner_radius[0],
+          box->corner_radius[1],
+          box->corner_radius[2],
+          box->corner_radius[3],
           8,
           box->background_color);
     }
 
     if(box->flags & UI_BOX_FLAG_DRAW_BORDER) {
       DrawRectangleRoundedLinesPro(rec,
-          box->corner_radius_0,
-          box->corner_radius_1,
-          box->corner_radius_2,
-          box->corner_radius_3,
+          box->corner_radius[0],
+          box->corner_radius[1],
+          box->corner_radius[2],
+          box->corner_radius[3],
           8,
           box->border_size,
           box->border_color);
     }
 
-    if(box->flags & UI_BOX_FLAG_DRAW_TEXT) {
-      Arena_scope scope = scope_begin(ui->draw_arena);
+    if(box->flags & UI_BOX_FLAG_DRAW_TEXT) arena_scope(ui->draw_arena) {
 
-      char *text_cstr = push_cstr_copy_str8(ui->draw_arena, box->text);
+      char *text_cstr = cstr_copy_str8(ui->draw_arena, box->text);
 
-      f32 box_mid_x = (box->final_rect.max[0] + box->final_rect.min[0]) * 0.5f;
-      f32 box_mid_y = (box->final_rect.max[1] + box->final_rect.min[1]) * 0.5f;
+      f32 box_mid_x = (box->final_rect_max[0] + box->final_rect_min[0]) * 0.5f;
+      f32 box_mid_y = (box->final_rect_max[1] + box->final_rect_min[1]) * 0.5f;
       Vector2 text_size =
         MeasureTextEx(
             ui->fonts[box->font_id],
@@ -1386,11 +1391,11 @@ void ui_draw(UI_context *ui) {
           } break;
         case UI_TEXT_ALIGN_LEFT:
           {
-            text_pos.x = box->final_rect.min[0] + box->padding;
+            text_pos.x = box->final_rect_min[0] + box->padding;
           } break;
         case UI_TEXT_ALIGN_RIGHT:
           {
-            text_pos.x = box->final_rect.max[0] - text_size.x - box->padding;
+            text_pos.x = box->final_rect_max[0] - text_size.x - box->padding;
           } break;
       }
 
@@ -1402,13 +1407,24 @@ void ui_draw(UI_context *ui) {
           box->font_spacing,
           box->text_color);
 
-      scope_end(scope);
-
     }
 
     if(box->flags & UI_BOX_FLAG_CLIP) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
+
+#if 0
+    arena_scope(ui->temp) {
+
+      Vector2 pos = { rec.x, rec.y };
+
+      SetTextLineSpacing(1);
+      DrawTextEx(GetFontDefault(), (char*)str8f(ui->temp, "hash = %li\t\t\tsrc_str = %S", box->key.hash, box->key.src_str).s, pos, 10, 1.0, GREEN);
+
+      SetTextLineSpacing(5);
+      DrawRectangleLinesEx(rec, 1.0, RED);
+    }
+#endif
 
     if(box->first) {
       box = box->first;
