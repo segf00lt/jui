@@ -13,7 +13,9 @@
 
 #define GAME_TITLE "UI Test"
 #define TARGET_FPS 60
+#define MIN_FPS 15
 #define TARGET_FRAME_TIME ((float)(1.0f / (float)TARGET_FPS))
+#define MIN_FRAME_TIME ((float)(1.0f / (float)MIN_FPS))
 
 #define WINDOW_WIDTH  ((float)GetScreenWidth())
 #define WINDOW_HEIGHT ((float)GetScreenHeight())
@@ -132,8 +134,6 @@ void ui_spacer(UI_context *ui, f32 size);
  */
 
 int text_line_spacing = 5;
-
-int _nocheckin = 0;
 
 Vector2 window_pos2 =
 {
@@ -278,7 +278,7 @@ func UI_signal item_button(Game *gp, Item_node *item) {
 func UI_signal item_list_window(Game *gp, Item_list *list) {
   UI_context *ui = gp->ui;
 
-  UI_box_flag flags =
+  UI_box_flags flags =
     UI_BOX_FLAG_FLOATING |
     UI_BOX_FLAG_DRAW_BACKGROUND |
     UI_BOX_FLAG_MOUSE_CLICKABLE |
@@ -287,11 +287,12 @@ func UI_signal item_list_window(Game *gp, Item_list *list) {
 
   UI_box *box;
   UI_size width = { .kind = UI_SIZE_PIXELS, .value = 200.0f, };
-  UI_size height = { .kind = UI_SIZE_CHILDREN_SUM };
+  //UI_size height = { .kind = UI_SIZE_CHILDREN_SUM };
+  UI_size height = { .kind = UI_SIZE_PIXELS, .value = 400.0f, };
 
   ui_child_layout_axis(UI_AXIS_Y)
     ui_semantic_width(width) ui_semantic_height(height)
-    ui_floating_position(list->pos)
+    ui_fixed_position(list->pos)
 
     box = ui_make_box_from_str(gp->ui, flags, list->id);
 
@@ -310,7 +311,7 @@ func UI_signal item_list_window(Game *gp, Item_list *list) {
 
 func UI_signal ui_button(UI_context *ui, Str8 label) {
 
-  UI_box_flag flags =
+  UI_box_flags flags =
     UI_BOX_FLAG_DRAW_BACKGROUND |
     UI_BOX_FLAG_DRAW_TEXT |
     UI_BOX_FLAG_DRAW_BORDER |
@@ -324,7 +325,6 @@ func UI_signal ui_button(UI_context *ui, Str8 label) {
   Color background_color = box->background_color;
 
   if(ui_key_match(ui_hot_box_key(ui), box->key)) {
-    _nocheckin += 1;
     box->background_color = ColorBrightness(background_color, 0.12f);
   }
 
@@ -341,11 +341,11 @@ func void game_update_and_draw(Game *gp) {
     game_reset(gp);
   }
 
-  _nocheckin = 0;
-
   UI_context *ui = gp->ui;
 
-  gp->dt = GetFrameTime();
+  gp->dt = Clamp(GetFrameTime(), MIN_FRAME_TIME, TARGET_FRAME_TIME);
+
+  ui->scroll_rate = 10.0f;
 
   if(WindowShouldClose()) {
     gp->quit = 1;
@@ -362,13 +362,24 @@ func void game_update_and_draw(Game *gp) {
 #if 1
     Color window_background_color = ColorBrightness(BLUE, -0.4f);
 
+    if(gp->dragging_item) {
+      ui->permission_flags |=
+        UI_PERMISSION_FLAG_CLICKS_RIGHT |
+        UI_PERMISSION_FLAG_CLICKS_MIDDLE |
+        0;
+    } else {
+      ui->permission_flags &=
+        ~UI_PERMISSION_FLAG_CLICKS_RIGHT &
+        ~UI_PERMISSION_FLAG_CLICKS_MIDDLE &
+        1;
+    }
 
     for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
       Item_list *list = &gp->item_lists[list_i];
 
       UI_signal window_sig;
 
-      ui_background_color(window_background_color)
+      ui_flags(UI_BOX_FLAG_CLIP | UI_BOX_FLAG_VIEW_SCROLL | UI_BOX_FLAG_CLAMP_VIEW) ui_background_color(window_background_color)
         window_sig = item_list_window(gp, list);
 
       list->sig = window_sig;
@@ -385,7 +396,7 @@ func void game_update_and_draw(Game *gp) {
               UI_signal item_sig;
 
               UI_size width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0, .strictness = 0 };
-              UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 };
+              UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
               ui_semantic_width(width) ui_semantic_height(height)
                 item_sig = item_button(gp, item);
@@ -410,7 +421,7 @@ func void game_update_and_draw(Game *gp) {
 
       UI_signal dragging_sig;
 
-      ui_flags(UI_BOX_FLAG_FLOATING) ui_floating_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
+      ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
         ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
         ui_fixed_width(gp->draggin_item_size[0]) ui_fixed_height(gp->draggin_item_size[1])
         dragging_sig = item_button(gp, gp->dragging_item);
@@ -441,7 +452,7 @@ func void game_update_and_draw(Game *gp) {
     };
 
 
-    ui_flags(UI_BOX_FLAG_FLOATING) ui_floating_position(window_pos1)
+    ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(window_pos1)
       ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
       ui_child_layout_axis(UI_AXIS_Y)
       {
@@ -473,7 +484,7 @@ func void game_update_and_draw(Game *gp) {
       ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
       ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250}))
       ui_border_color(RED) ui_border_size(2.0f)
-      ui_flags(UI_BOX_FLAG_FLOATING | UI_BOX_FLAG_CLIP | 0) ui_floating_position(window_pos2)
+      ui_flags(UI_BOX_FLAG_FLOATING | UI_BOX_FLAG_CLIP | 0) ui_fixed_position(window_pos2)
       {
         UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
 

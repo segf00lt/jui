@@ -32,6 +32,13 @@
   X(MOUSE_SCROLL) \
   X(KEYBOARD_PRESSED) \
 
+#define UI_PERMISSION_FLAGS \
+  X(CLICKS_LEFT) \
+  X(CLICKS_MIDDLE) \
+  X(CLICKS_RIGHT) \
+  X(SCROLL) \
+  X(KEYBOARD) \
+
 #define UI_SIGNAL_FLAGS \
   UI_MOUSE_BUTTON_ACTIONS \
   \
@@ -108,9 +115,9 @@
 #define UI_OTHER_PROPERTIES \
   /* lower               lower_alt                  type              init                      stack_size */ \
   X( parent,             parent,                    UI_box_ptr,       nil_ui_box,               16          ) \
-  X( flags,              flags,                     UI_box_flag,      0,                        16          ) \
-  X( floating_position,  floating_position,         Vector2,          ((Vector2){0}),           4           ) \
-  X( exclude_flags,      exclude_flags,             UI_box_flag,      0,                        16          ) \
+  X( flags,              flags,                     UI_box_flags,      0,                        16          ) \
+  X( fixed_position,     fixed_position,         Vector2,          ((Vector2){0}),           4           ) \
+  X( exclude_flags,      exclude_flags,             UI_box_flags,      0,                        16          ) \
 
 #define UI_PROPERTIES \
   UI_STYLE_PROPERTIES \
@@ -146,7 +153,7 @@
 
 #define ui_padding(value) ui_prop(padding, (value))
 
-#define ui_floating_position(value) ui_prop(floating_position, (value))
+#define ui_fixed_position(value) ui_prop(fixed_position, (value))
 
 #define ui_child_layout_axis(value) ui_prop(child_layout_axis, (value))
 
@@ -169,10 +176,6 @@ typedef struct UI_box_hash_slot UI_box_hash_slot;
 typedef struct UI_key UI_key;
 typedef struct UI_size UI_size;
 typedef struct UI_signal UI_signal;
-typedef u32 UI_input_flag;
-typedef u64 UI_box_flag;
-typedef u64 UI_context_flag;
-typedef u64 UI_signal_flag;
 typedef UI_box* UI_box_ptr;
 
 typedef enum UI_size_kind {
@@ -221,7 +224,7 @@ typedef u32 UI_mouse_button_mask;
 UI_MOUSE_BUTTONS
 #undef X
 
-typedef enum UI_box_flag_index {
+typedef enum UI_box_flags_index {
   UI_BOX_FLAG_INDEX_NONE = -1,
 #define X(f) UI_BOX_FLAG_INDEX_##f,
   UI_BOX_FLAGS
@@ -229,13 +232,14 @@ typedef enum UI_box_flag_index {
     UI_BOX_FLAG_INDEX_MAX,
 } UI_box_flags_index;
 
+typedef u64 UI_box_flags;
 STATIC_ASSERT(UI_BOX_FLAG_INDEX_MAX < 64, UI_BOX_FLAG_INDEX_MAX__is_less_than_64);
 
-#define X(f) const UI_box_flag UI_BOX_FLAG_##f = (1ull<<UI_BOX_FLAG_INDEX_##f);
+#define X(f) const UI_box_flags UI_BOX_FLAG_##f = (1ull<<UI_BOX_FLAG_INDEX_##f);
 UI_BOX_FLAGS
 #undef X
 
-typedef enum UI_context_flag_index {
+typedef enum UI_context_flags_index {
   UI_CONTEXT_FLAG_INDEX_NONE = -1,
 #define X(f) UI_CONTEXT_FLAG_INDEX_##f,
   UI_CONTEXT_FLAGS
@@ -243,13 +247,14 @@ typedef enum UI_context_flag_index {
     UI_CONTEXT_FLAG_INDEX_MAX,
 } UI_context_flags_index;
 
+typedef u64 UI_context_flags;
 STATIC_ASSERT(UI_CONTEXT_FLAG_INDEX_MAX < 64, UI_CONTEXT_FLAG_INDEX_MAX__is_less_than_64);
 
-#define X(f) const UI_context_flag UI_CONTEXT_FLAG_##f = (1ull<<UI_CONTEXT_FLAG_INDEX_##f);
+#define X(f) const UI_context_flags UI_CONTEXT_FLAG_##f = (1ull<<UI_CONTEXT_FLAG_INDEX_##f);
 UI_CONTEXT_FLAGS
 #undef X
 
-typedef enum UI_signal_flag_index {
+typedef enum UI_signal_flags_index {
   UI_SIGNAL_FLAG_INDEX_NONE = -1,
 #define X(f) UI_SIGNAL_FLAG_INDEX_##f,
   UI_SIGNAL_FLAGS
@@ -257,13 +262,14 @@ typedef enum UI_signal_flag_index {
     UI_SIGNAL_FLAG_INDEX_MAX,
 } UI_signal_flags_index;
 
+typedef u64 UI_signal_flags;
 STATIC_ASSERT(UI_SIGNAL_FLAG_INDEX_MAX < 64, UI_SIGNAL_FLAG_INDEX_MAX__is_less_than_64);
 
-#define X(f) const UI_signal_flag UI_SIGNAL_FLAG_##f = (1ull<<UI_SIGNAL_FLAG_INDEX_##f);
+#define X(f) const UI_signal_flags UI_SIGNAL_FLAG_##f = (1ull<<UI_SIGNAL_FLAG_INDEX_##f);
 UI_SIGNAL_FLAGS
 #undef X
 
-typedef enum UI_input_flag_index {
+typedef enum UI_input_flags_index {
   UI_INPUT_FLAG_INDEX_NONE = -1,
 #define X(f) UI_INPUT_FLAG_INDEX_##f,
   UI_INPUT_FLAGS
@@ -271,10 +277,26 @@ typedef enum UI_input_flag_index {
     UI_INPUT_FLAG_INDEX_MAX,
 } UI_input_flags_index;
 
-STATIC_ASSERT(UI_INPUT_FLAG_INDEX_MAX < (sizeof(UI_input_flag)<<3), UI_INPUT_FLAG_INDEX_MAX__is_within_size);
+typedef u32 UI_input_flags;
+STATIC_ASSERT(UI_INPUT_FLAG_INDEX_MAX < (sizeof(UI_input_flags)<<3), UI_INPUT_FLAG_INDEX_MAX__is_within_size);
 
-#define X(f) const UI_input_flag UI_INPUT_FLAG_##f = (1ull<<UI_INPUT_FLAG_INDEX_##f);
+#define X(f) const UI_input_flags UI_INPUT_FLAG_##f = (1u<<UI_INPUT_FLAG_INDEX_##f);
 UI_INPUT_FLAGS
+#undef X
+
+typedef enum UI_permission_flags_index {
+  UI_PERMISSION_FLAG_INDEX_NONE = -1,
+#define X(f) UI_PERMISSION_FLAG_INDEX_##f,
+  UI_PERMISSION_FLAGS
+#undef X
+    UI_PERMISSION_FLAG_INDEX_MAX,
+} UI_permission_flags_index;
+
+typedef u32 UI_permission_flags;
+STATIC_ASSERT(UI_PERMISSION_FLAG_INDEX_MAX < (sizeof(UI_permission_flags)<<3), UI_PERMISSION_FLAG_INDEX_MAX__is_within_size);
+
+#define X(f) const UI_permission_flags UI_PERMISSION_FLAG_##f = (1u<<UI_PERMISSION_FLAG_INDEX_##f);
+UI_PERMISSION_FLAGS
 #undef X
 
 DECL_UI_ARR(UI_box_ptr);
@@ -289,7 +311,7 @@ DECL_UI_ARR(s32);
 DECL_UI_ARR(s64);
 DECL_UI_ARR(f32);
 DECL_UI_ARR(Vector2);
-DECL_UI_ARR(UI_box_flag);
+DECL_UI_ARR(UI_box_flags);
 DECL_UI_ARR(UI_axis);
 DECL_UI_ARR(UI_size);
 DECL_UI_ARR(UI_text_align);
@@ -311,8 +333,8 @@ struct UI_size {
 };
 
 struct UI_box {
-  UI_box_flag flags;
-  UI_box_flag exclude_flags;
+  UI_box_flags flags;
+  UI_box_flags exclude_flags;
 
   UI_key key;
 
@@ -338,7 +360,7 @@ struct UI_box {
   UI_text_align text_align;
   UI_size semantic_size[UI_AXIS_COUNT];
   f32 padding;
-  Vector2 floating_position;
+  Vector2 fixed_position;
   UI_axis child_layout_axis;
 
   Str8 text;
@@ -361,7 +383,7 @@ struct UI_box {
 };
 
 struct UI_signal {
-  UI_signal_flag flags;
+  UI_signal_flags flags;
   UI_box *box;
   s16 scroll[2];
   UI_modifier_keys_mask modifier_keys;
@@ -400,7 +422,9 @@ struct UI_context {
 
   Font fonts[8];
 
-  UI_input_flag input_flags;
+  UI_context_flags flags;
+  UI_input_flags input_flags;
+  UI_permission_flags permission_flags;
   UI_mouse_button_mask mouse_buttons_active;
   Vector2 mouse_pos;
   Vector2 drag_start_pos;
@@ -408,6 +432,7 @@ struct UI_context {
   UI_modifier_keys_mask modifier_keys;
   u32 keyboard_key_pressed;
   b32 took_input_event;
+  f32 scroll_rate;
 
   UI_key active_box_key[UI_MOUSE_BUTTON_COUNT];
   UI_key hot_box_key;
@@ -441,9 +466,9 @@ Str8 ui_strip_id_from_text(Str8 text);
 
 Vector2 ui_drag_delta(UI_context *ui);
 
-UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key);
-UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str);
-UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...);
+UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key);
+UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flags flags, Str8 str);
+UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flags flags, char *fmt, ...);
 UI_box* ui_make_transient_box(UI_context *ui);
 
 UI_box_node* ui_push_box_node(UI_context *ui);
@@ -515,6 +540,7 @@ func UI_context* ui_init(void) {
   ui->fonts[0] = GetFontDefault();
 
   ui->dummy = &ui->__dummy;
+  ui->scroll_rate = 1.0f;
 
   return ui;
 }
@@ -596,7 +622,7 @@ func UI_box* ui_make_transient_box(UI_context *ui) {
   return ui_make_box_from_key(ui, 0, ((UI_key){0}));
 }
 
-func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key) {
+func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key) {
 
 #define X(lower, lower_alt, type, init, stack_size) type cur_##lower = arr_last(ui->lower##_stack);
   UI_PROPERTIES;
@@ -673,7 +699,7 @@ func Str8 ui_strip_id_from_text(Str8 text) {
   return text;
 }
 
-func UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str) {
+func UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flags flags, Str8 str) {
   UI_key key = ui_key_from_str(str);
 
   UI_box *box = ui_make_box_from_key(ui, flags, key);
@@ -685,7 +711,7 @@ func UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flag flags, Str8 str) {
   return box;
 }
 
-func UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flag flags, char *fmt, ...) {
+func UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flags flags, char *fmt, ...) {
   UI_box *box = NULL;
 
   arena_scope(ui->temp) {
@@ -810,62 +836,79 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     ui->drop_hot_box_key = ui_key_nil();
   }
 
-  if((box->flags & UI_BOX_FLAG_SCROLL) &&
-      (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
-      (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
-      mouse_in_bounds)
-  {
-    taken = 1;
+  { /* scrolling */
     s16 delta[2] = {
-      (ui->scroll_delta.x > 0) ? 1 : -1, 
-      (ui->scroll_delta.y > 0) ? 1 : -1, 
+      (ui->scroll_delta.x > 0) ? 1 : ((ui->scroll_delta.x < 0) ? -1 : 0), 
+      (ui->scroll_delta.y > 0) ? 1 : ((ui->scroll_delta.y < 0) ? -1 : 0), 
     };
 
     if(ui->modifier_keys & UI_MOD_MASK_SHIFT) {
       SWAP(delta[0], delta[1], s16);
     }
 
-    sig.scroll[0] = delta[0];
-    sig.scroll[1] = delta[1];
+    delta[0] *= ui->scroll_rate;
+    delta[1] *= ui->scroll_rate;
 
-    sig.flags |= UI_SIGNAL_FLAG_SCROLL;
-  }
+    if((box->flags & UI_BOX_FLAG_SCROLL) &&
+        (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
+        (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
+        mouse_in_bounds)
+    {
+      taken = 1;
 
-  if((box->flags & UI_BOX_FLAG_VIEW_SCROLL) &&
-      box->first_visited_build_index != box->last_visited_build_index &&
-      (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
-      (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
-      mouse_in_bounds)
-  {
-    taken = 1;
-    s16 delta[2] = {
-      (ui->scroll_delta.x > 0) ? 1 : -1, 
-      (ui->scroll_delta.y > 0) ? 1 : -1, 
-    };
+      sig.scroll[0] = delta[0];
+      sig.scroll[1] = delta[1];
 
-    if(ui->modifier_keys & UI_MOD_MASK_SHIFT) {
-      SWAP(delta[0], delta[1], s16);
+      sig.flags |= UI_SIGNAL_FLAG_SCROLL;
     }
 
-    if(!(box->flags & UI_BOX_FLAG_VIEW_SCROLL_X)) {
-      if(delta[1] == 0) {
-        delta[1] = delta[0];
+    b32 view_scrolled = 0;
+
+    if((box->flags & UI_BOX_FLAG_VIEW_SCROLL) &&
+        box->first_visited_build_index != box->last_visited_build_index &&
+        (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
+        (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
+        mouse_in_bounds)
+    {
+      taken = 1;
+      view_scrolled = 1;
+
+      if(!(box->flags & UI_BOX_FLAG_VIEW_SCROLL_X)) {
+        delta[0] = 0;
       }
-      delta[0] = 0;
-    }
 
-    if(!(box->flags & UI_BOX_FLAG_VIEW_SCROLL_Y)) {
-      if(delta[0] == 0) {
-        delta[0] = delta[1];
+      if(!(box->flags & UI_BOX_FLAG_VIEW_SCROLL_Y)) {
+        delta[1] = 0;
       }
-      delta[1] = 0;
+
+      box->view_offset_target[0] += (f32)delta[0];
+      box->view_offset_target[1] += (f32)delta[1];
+
+      // TODO animate view scrolling
+      box->view_offset[0] = box->view_offset_target[0];
+      box->view_offset[1] = box->view_offset_target[1];
+
+      sig.flags |= UI_SIGNAL_FLAG_SCROLL;
     }
 
-    box->view_offset_target[0] += (f32)delta[0];
-    box->view_offset_target[1] += (f32)delta[1];
+    // TODO fix view clamping
+    if(view_scrolled && box->flags & UI_BOX_FLAG_CLAMP_VIEW) {
+      f32 max_view_offset_target[2] = {
+        CLAMP_BOT(0, box->view_bounds[0] - box->fixed_size[0]),
+        CLAMP_BOT(0, box->view_bounds[1] - box->fixed_size[1]),
+      };
 
-    sig.flags |= UI_SIGNAL_FLAG_SCROLL;
-  }
+      if(box->flags & UI_BOX_FLAG_CLAMP_VIEW_X) {
+        box->view_offset_target[0] = Clamp(0, box->view_offset_target[0], max_view_offset_target[0]);
+      }
+
+      if(box->flags & UI_BOX_FLAG_CLAMP_VIEW_Y) {
+        box->view_offset_target[1] = Clamp(0, box->view_offset_target[1], max_view_offset_target[1]);
+      }
+
+    }
+
+  } /* scrolling */
 
   if(taken) {
     ui->took_input_event = 1;
@@ -878,7 +921,6 @@ func void ui_get_input(UI_context *ui) {
   ui->took_input_event = 0;
   ui->input_flags = 0;
   ui->mouse_buttons_active = 0;
-  ui->modifier_keys = 0;
 
   ui->mouse_pos = GetMousePosition();
   ui->scroll_delta = GetMouseWheelMoveV();
@@ -891,6 +933,9 @@ func void ui_get_input(UI_context *ui) {
   };
 
   for(int i = 0; i < ARRLEN(raylib_mouse_buttons); i++) {
+
+    if(ui->permission_flags & (UI_PERMISSION_FLAG_CLICKS_LEFT << i)) continue;
+
     if(IsMouseButtonPressed(raylib_mouse_buttons[i])) {
       ui->input_flags |= UI_INPUT_FLAG_MOUSE_PRESS;
       ui->mouse_buttons_active |= (UI_mouse_button_mask)(1<<i);
@@ -904,17 +949,24 @@ func void ui_get_input(UI_context *ui) {
   }
 
   if(ui->scroll_delta.x != 0.0f || ui->scroll_delta.y != 0.0f) {
-    ui->input_flags |= UI_INPUT_FLAG_MOUSE_SCROLL;
+    if(!(ui->permission_flags & UI_PERMISSION_FLAG_SCROLL)) {
+      ui->input_flags |= UI_INPUT_FLAG_MOUSE_SCROLL;
+    }
   }
 
-  if(ui->keyboard_key_pressed != 0) {
-
+  if(!(ui->permission_flags & UI_PERMISSION_FLAG_KEYBOARD)) {
 #define X(mod) \
-    if(ui->keyboard_key_pressed == KEY_LEFT_##mod || ui->keyboard_key_pressed == KEY_RIGHT_##mod) { \
+    if(IsKeyPressed(KEY_LEFT_##mod) || IsKeyPressed(KEY_RIGHT_##mod)) { \
       ui->modifier_keys |= UI_MOD_MASK_##mod; \
+    } \
+    if(IsKeyReleased(KEY_LEFT_##mod) || IsKeyReleased(KEY_RIGHT_##mod)) { \
+      ui->modifier_keys &= ~UI_MOD_MASK_##mod; \
     }
     UI_MODIFIER_KEYS;
 #undef X
+  }
+
+  if(ui->keyboard_key_pressed != 0 && !(ui->permission_flags & UI_PERMISSION_FLAG_KEYBOARD)) {
 
     if(ui->modifier_keys == 0) {
       ui->input_flags |= UI_INPUT_FLAG_KEYBOARD_PRESSED;
@@ -1013,7 +1065,7 @@ func void ui_end_build(UI_context *ui) {
     }
   }
 
-  for(int axis = 0; axis < 2; axis++) 
+  for(int axis = 0; axis < 2; axis++) {
     UI_PROFILE(ui_prof_time_to_do_1st_pass) {
 
       UI_PROFILE(ui_prof_time_to_calc_absolute_sized_boxes) { /* visit nodes with UI_SIZE_PIXELS or UI_SIZE_TEXT_CONTENT */
@@ -1197,8 +1249,10 @@ func void ui_end_build(UI_context *ui) {
 
       } /* solve size violations in a pre order traversal */
     }
+  }
 
-  UI_PROFILE(ui_prof_time_to_calc_positions) { /* calculate the relative and then absolute positions of each box in pre order */
+  UI_PROFILE(ui_prof_time_to_calc_positions)
+  { /* calculate the relative and then absolute positions of each box in pre order */
 
     for(UI_box *node = ui->root; node;) {
       UI_box *parent = node->parent;
@@ -1210,7 +1264,7 @@ func void ui_end_build(UI_context *ui) {
       f32 final_axis_min = 0.0f;
 
       if(node->flags & (UI_BOX_FLAG_FLOATING_X << layout_axis)) {
-        final_layout_axis_min = (&(node->floating_position.x))[layout_axis];
+        final_layout_axis_min = (&(node->fixed_position.x))[layout_axis];
       } else {
         f32 parent_layout_axis_pos = 0.0f;
         if(parent) {
@@ -1228,7 +1282,7 @@ func void ui_end_build(UI_context *ui) {
       }
 
       if(node->flags & (UI_BOX_FLAG_FLOATING_X << axis)) {
-        final_axis_min = (&(node->floating_position.x))[axis];
+        final_axis_min = (&(node->fixed_position.x))[axis];
       } else {
         f32 parent_axis_pos = 0.0f;
         if(parent) {
@@ -1238,16 +1292,29 @@ func void ui_end_build(UI_context *ui) {
         final_axis_min = parent_axis_pos;
       }
 
-      node->final_rect_min[layout_axis] = final_layout_axis_min;
-      node->final_rect_min[axis] = final_axis_min;
-      node->final_rect_max[layout_axis] = final_layout_axis_min + node->fixed_size[layout_axis];
-      node->final_rect_max[axis] = final_axis_min + node->fixed_size[axis];
+      f32 layout_view_offset = 0.0f;
+      f32 view_offset = 0.0f;
+      if(node->parent) {
+        layout_view_offset = floor_f32(node->parent->view_offset[layout_axis]);
+        view_offset = floor_f32(node->parent->view_offset[axis]);
+      }
+
+      node->final_rect_min[layout_axis] = final_layout_axis_min - layout_view_offset;
+      node->final_rect_min[axis] = final_axis_min - view_offset;
+
+      node->final_rect_max[layout_axis] = final_layout_axis_min + node->fixed_size[layout_axis] - layout_view_offset;
+      node->final_rect_max[axis] = final_axis_min + node->fixed_size[axis] - view_offset;
+
+      node->final_rect_min[0] = floor_f32(node->final_rect_min[0]);
+      node->final_rect_min[1] = floor_f32(node->final_rect_min[1]);
+      node->final_rect_max[0] = floor_f32(node->final_rect_max[0]);
+      node->final_rect_max[1] = floor_f32(node->final_rect_max[1]);
 
       node->view_bounds[layout_axis] = node->fixed_size[layout_axis];
       node->view_bounds[axis] = node->fixed_size[axis];
 
-      node->floating_position.x = node->final_rect_min[0];
-      node->floating_position.y = node->final_rect_min[1];
+      node->fixed_position.x = node->final_rect_min[0];
+      node->fixed_position.y = node->final_rect_min[1];
 
       if(node->first) {
         node = node->first;
@@ -1429,11 +1496,12 @@ func void ui_draw(UI_context *ui) {
 
     }
 
+    // TODO fix clipping bug
     if(box->flags & UI_BOX_FLAG_CLIP) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 0
+#if 1
     arena_scope(ui->temp) {
 
       Vector2 pos = { rec.x, rec.y };
