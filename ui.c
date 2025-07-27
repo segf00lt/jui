@@ -50,11 +50,14 @@
   X(SUPER) \
 
 #define UI_BOX_FLAGS \
-  X(IS_FLOATING) \
   X(DRAW_TEXT) \
   X(DRAW_BACKGROUND) \
   X(DRAW_BORDER) \
   X(CLIP) \
+  X(FIXED_WIDTH) \
+  X(FIXED_HEIGHT) \
+  X(FLOATING_X) \
+  X(FLOATING_Y) \
   X(OVERFLOW_X) \
   X(OVERFLOW_Y) \
   X(MOUSE_CLICKABLE) \
@@ -71,6 +74,9 @@
 #define UI_BOX_FLAG_VIEW_SCROLL (UI_BOX_FLAG_VIEW_SCROLL_X | UI_BOX_FLAG_VIEW_SCROLL_Y)
 #define UI_BOX_FLAG_CLAMP_VIEW (UI_BOX_FLAG_CLAMP_VIEW_X | UI_BOX_FLAG_CLAMP_VIEW_Y)
 #define UI_BOX_FLAG_SKIP_VIEW_OFFSET (UI_BOX_FLAG_SKIP_VIEW_OFFSET_X | UI_BOX_FLAG_SKIP_VIEW_OFFSET_Y)
+#define UI_BOX_FLAG_FLOATING (UI_BOX_FLAG_FLOATING_X | UI_BOX_FLAG_FLOATING_Y)
+#define UI_BOX_FLAG_OVERFLOW (UI_BOX_FLAG_OVERFLOW_X | UI_BOX_FLAG_OVERFLOW_Y)
+#define UI_BOX_FLAG_FIXED_SIZE (UI_BOX_FLAG_FIXED_WIDTH | UI_BOX_FLAG_FIXED_HEIGHT)
 
 
 #define UI_STYLE_PROPERTIES \
@@ -100,11 +106,11 @@
   X( fixed_height,   fixed_size[1],    f32,              ((f32)0),                           4           ) \
 
 #define UI_OTHER_PROPERTIES \
-  /* lower            lower_alt                  type              init                      stack_size */ \
-  X( parent,          parent,                    UI_box_ptr,       nil_ui_box,               16          ) \
-  X( flags,           flags,                     UI_box_flag,      0,                        16          ) \
+  /* lower               lower_alt                  type              init                      stack_size */ \
+  X( parent,             parent,                    UI_box_ptr,       nil_ui_box,               16          ) \
+  X( flags,              flags,                     UI_box_flag,      0,                        16          ) \
   X( floating_position,  floating_position,         Vector2,          ((Vector2){0}),           4           ) \
-  X( exclude_flags,   exclude_flags,             UI_box_flag,      0,                        16          ) \
+  X( exclude_flags,      exclude_flags,             UI_box_flag,      0,                        16          ) \
 
 #define UI_PROPERTIES \
   UI_STYLE_PROPERTIES \
@@ -133,6 +139,10 @@
 #define ui_semantic_width(value) ui_prop(semantic_width, (value))
 #define ui_semantic_height(value) ui_prop(semantic_height, (value))
 #define ui_semantic_size(value) ui_semantic_width((value)) ui_semantic_height((value))
+
+#define ui_fixed_width(value) ui_prop(fixed_width, (value))
+#define ui_fixed_height(value) ui_prop(fixed_height, (value))
+#define ui_fixed_size(value) ui_fixed_width((value)) ui_fixed_height((value))
 
 #define ui_padding(value) ui_prop(padding, (value))
 
@@ -638,20 +648,17 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flag flags, UI_key key)
 #undef X
 
   if(ui->fixed_width_stack.count > 0) {
+    box->flags |= UI_BOX_FLAG_FIXED_WIDTH;
     box->fixed_size[0] = cur_fixed_width;
   }
 
   if(ui->fixed_height_stack.count > 0) {
+    box->flags |= UI_BOX_FLAG_FIXED_HEIGHT;
     box->fixed_size[1] = cur_fixed_height;
   }
 
-  if(ui->min_width_stack.count > 0) {
-    box->min_size[0] = cur_min_width;
-  }
-
-  if(ui->min_height_stack.count > 0) {
-    box->min_size[1] = cur_min_height;
-  }
+  box->min_size[0] = cur_min_width;
+  box->min_size[1] = cur_min_height;
 
   box->flags |= flags;
 
@@ -727,15 +734,15 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
 
   b8 mouse_in_bounds = CheckCollisionPointRec(ui->mouse_pos, box_rec);
 
+  if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
+      mouse_in_bounds)
+  {
+    sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
+    ui->hot_box_key = box->key;
+  }
+
   for(UI_mouse_button btn = UI_MOUSE_BUTTON_LEFT; btn < UI_MOUSE_BUTTON_COUNT; btn++) {
     b8 btn_on = ui->mouse_buttons_active & ui_mouse_button_mask(btn);
-
-    if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
-        mouse_in_bounds)
-    {
-      sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
-      ui->hot_box_key = box->key;
-    }
 
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
         (ui->input_flags & UI_INPUT_FLAG_MOUSE_PRESS) &&
@@ -752,7 +759,7 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
         (ui->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE) &&
         btn_on &&
-        //ui_key_match(ui_active_box_key(ui, btn), box->key) &&
+        ui_key_match(ui_active_box_key(ui, btn), box->key) &&
         ui_key_match(ui_hot_box_key(ui), box->key) &&
         mouse_in_bounds
       )
@@ -961,7 +968,7 @@ func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis
   {
 
     if(axis == layout_axis) {
-      if(!(box->flags & UI_BOX_FLAG_IS_FLOATING)) {
+      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
         sum += box->fixed_size[axis];
       }
 
@@ -969,7 +976,7 @@ func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis
         sum += ui_calc_downward_dependent_sizes(box->next, axis, layout_axis);
       }
     } else {
-      if(!(box->flags & UI_BOX_FLAG_IS_FLOATING)) {
+      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
         sum = MAX(box->fixed_size[axis], sum);
       }
 
@@ -1061,11 +1068,21 @@ func void ui_end_build(UI_context *ui) {
         for(UI_box *node = ui->root; node;) {
 
           UI_size size = node->semantic_size[axis];
+          f32 size_value = 0.0f;
 
           if(size.kind == UI_SIZE_PERCENT_OF_PARENT) {
-            if(node->parent) {
-              node->fixed_size[axis] = size.value * node->parent->fixed_size[axis];
+            for(UI_box *parent = node->parent; parent; parent = parent->parent) {
+              if(parent->flags & (UI_BOX_FLAG_FIXED_WIDTH << axis) ||
+                  parent->semantic_size[axis].kind == UI_SIZE_PIXELS ||
+                  parent->semantic_size[axis].kind == UI_SIZE_TEXT_CONTENT ||
+                  parent->semantic_size[axis].kind == UI_SIZE_PERCENT_OF_PARENT)
+              {
+                size_value = size.value * parent->fixed_size[axis];
+                break;
+              }
             }
+
+            node->fixed_size[axis] = size_value;
           }
 
           if(node->first) {
@@ -1096,8 +1113,7 @@ func void ui_end_build(UI_context *ui) {
             f32 allowed_size = node->fixed_size[axis];
 
             for(UI_box *child = node->first; child; child = child->next) {
-              // TODO floating on x and y axis separately
-              if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
+              if(!(child->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
                 f32 child_size = child->fixed_size[axis];
                 f32 violation = child_size - allowed_size;
                 f32 max_fixup = child_size;
@@ -1116,8 +1132,7 @@ func void ui_end_build(UI_context *ui) {
             f32 total_weighted_size = 0;
 
             for(UI_box *child = node->first; child; child = child->next) {
-              // TODO floating on x and y axis separately
-              if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
+              if(!(child->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
                 total_size += child->fixed_size[axis];
                 total_weighted_size += child->fixed_size[axis] * (1-child->semantic_size[axis].strictness);
               }
@@ -1132,8 +1147,7 @@ func void ui_end_build(UI_context *ui) {
               {
                 u64 child_index = 0;
                 for(UI_box *child = node->first; child; child = child->next, child_index += 1) {
-                  // TODO floating on x and y axis separately
-                  if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
+                  if(!(child->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
                     f32 fixup_size_this_child = child->fixed_size[axis] * (1-child->semantic_size[axis].strictness);
                     fixup_size_this_child = CLAMP_BOT(0, fixup_size_this_child);
                     child_fixups[child_index] = fixup_size_this_child;
@@ -1144,8 +1158,7 @@ func void ui_end_build(UI_context *ui) {
               {
                 u64 child_index = 0;
                 for(UI_box *child = node->first; child; child = child->next, child_index += 1) {
-                  // TODO floating on x and y axis separately
-                  if(!(child->flags & (UI_BOX_FLAG_IS_FLOATING))) {
+                  if(!(child->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
                     f32 fixup_percent = (violation / total_weighted_size);
                     fixup_percent = Clamp(fixup_percent, 0, 1);
                     child->fixed_size[axis] -= child_fixups[child_index] * fixup_percent;
@@ -1195,16 +1208,13 @@ func void ui_end_build(UI_context *ui) {
 
       f32 final_layout_axis_min = 0.0f;
       f32 final_axis_min = 0.0f;
-      if(node->flags & UI_BOX_FLAG_IS_FLOATING) {
-        final_layout_axis_min = (&(node->floating_position.x))[layout_axis];
-        final_axis_min = (&(node->floating_position.x))[axis];
-      } else {
 
+      if(node->flags & (UI_BOX_FLAG_FLOATING_X << layout_axis)) {
+        final_layout_axis_min = (&(node->floating_position.x))[layout_axis];
+      } else {
         f32 parent_layout_axis_pos = 0.0f;
-        f32 parent_axis_pos = 0.0f;
         if(parent) {
           parent_layout_axis_pos = parent->final_rect_min[layout_axis];
-          parent_axis_pos = parent->final_rect_min[axis];
         }
 
         f32 rel_layout_axis_pos = 0.0f;
@@ -1215,6 +1225,16 @@ func void ui_end_build(UI_context *ui) {
         node->computed_rel_pos[layout_axis] = rel_layout_axis_pos;
 
         final_layout_axis_min = parent_layout_axis_pos + rel_layout_axis_pos;
+      }
+
+      if(node->flags & (UI_BOX_FLAG_FLOATING_X << axis)) {
+        final_axis_min = (&(node->floating_position.x))[axis];
+      } else {
+        f32 parent_axis_pos = 0.0f;
+        if(parent) {
+          parent_axis_pos = parent->final_rect_min[axis];
+        }
+
         final_axis_min = parent_axis_pos;
       }
 
