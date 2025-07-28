@@ -264,8 +264,7 @@ func UI_signal item_button(Game *gp, Item_node *item) {
 
   UI_signal sig = {0}; 
 
-  ui_border_size(1.0f)
-    ui_text_align(UI_TEXT_ALIGN_CENTER)
+  ui_text_align(UI_TEXT_ALIGN_CENTER)
     ui_padding(4.0f)
     ui_font_size(20.0f)
     ui_font_spacing(2.0f)
@@ -400,7 +399,13 @@ func void game_update_and_draw(Game *gp) {
             UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
             ui_semantic_width(width) ui_semantic_height(height)
+              ui_border_size(2.0f)
+              ui_corner_radius(0.2f)
               item_sig = item_button(gp, item);
+
+            if(next) {
+              ui_spacer(ui, 4);
+            }
 
             UI_box *item_box = item_sig.box;
 
@@ -425,6 +430,7 @@ func void game_update_and_draw(Game *gp) {
       ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
         ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
         ui_fixed_width(gp->draggin_item_size[0]) ui_fixed_height(gp->draggin_item_size[1])
+        ui_corner_radius(1.0f)
         dragging_sig = item_button(gp, gp->dragging_item);
 
       if(dragging_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE) {
@@ -444,8 +450,8 @@ func void game_update_and_draw(Game *gp) {
 
 #endif
 
-#if 0
 #if 1
+#if 0
     Vector2 window_pos1 =
     {
       .x = 20,
@@ -482,16 +488,16 @@ func void game_update_and_draw(Game *gp) {
 
 #if 1
     ui_child_layout_axis(1)
-      ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300}))
-      ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250}))
+      ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300, }))
+      ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250,  }))
       ui_border_color(RED) ui_border_size(2.0f)
-      ui_flags(UI_BOX_FLAG_FLOATING | UI_BOX_FLAG_CLIP | 0) ui_fixed_position(window_pos2)
+      ui_flags(UI_BOX_FLAG_FLOATING_X | 0) ui_fixed_position(window_pos2)
       {
         UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
 
         UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.7, };
         //UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
-        UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT };
+        UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f};
         ui_parent(container2)
           ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT|UI_BOX_FLAG_SCROLL)
           ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
@@ -501,6 +507,7 @@ func void game_update_and_draw(Game *gp) {
           //ui_corner_radius_0(0.8f)
           //ui_corner_radius_3(0.8f)
           //ui_corner_radius_2(0.8f)
+          ui_padding(4.0f)
           ui_font_size(20)
           ui_font_spacing(2.0f)
           ui_border_size(2.0f)

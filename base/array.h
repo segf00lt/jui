@@ -64,8 +64,11 @@ struct __Slice_header {
 #define arr_push_n_index(array, n) ((arr_push_no_zero_(header_ptr_from_arr((array)), arr_stride(array), (n))), (s64)((array).count - (n)))
 
 #define arr_clear(array) ((array).count = 0, memory_zero((array).d, arr_stride((array)) * (array).cap))
-#define arr_pop(array)        ( ( ((array).count > 0) ? ((array).count--) : (0) ), (array).d[(array).count] )
+
+#define arr_pop(array)        ( ( ((array).count > 0) ? ((array).count--) : (0) ), ( ((array).count <= 0) ? (arr_clear((array))) : (0) ), (array).d[(array).count] )
+
 #define arr_first(array) ((array).d[0])
+
 #define arr_last(array) ( ((array).count > 0) ? ((array).d[(array).count-1]) : ((array).d[0]) )
 
 #define arr_to_slice(T, array) (*(Slice(T)*)(&(array)))

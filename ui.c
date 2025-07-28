@@ -92,7 +92,7 @@
   X( background_color,   background_color,     Color,            ((Color){ 110, 110, 110, 255 }),    8           ) \
   X( text_color,         text_color,           Color,            ((Color){ 248, 248, 248, 255 }),    8           ) \
   X( border_color,       border_color,         Color,            ((Color){ 180, 180, 180, 255 }),    8           ) \
-  X( border_size,        border_size,          f32,              ((f32)1.0f),                        8           ) \
+  X( border_size,        border_size,          f32,              ((f32)0.0f),                        8           ) \
   X( corner_radius_0,    corner_radius[0],     f32,              ((f32)0.0f),                        8           ) \
   X( corner_radius_1,    corner_radius[1],     f32,              ((f32)0.0f),                        8           ) \
   X( corner_radius_2,    corner_radius[2],     f32,              ((f32)0.0f),                        8           ) \
@@ -114,11 +114,11 @@
   X( fixed_height,   fixed_size[1],    f32,              ((f32)0),                           4           ) \
 
 #define UI_OTHER_PROPERTIES \
-  /* lower               lower_alt                  type              init                      stack_size */ \
-  X( parent,             parent,                    UI_box_ptr,       nil_ui_box,               16          ) \
-  X( flags,              flags,                     UI_box_flags,      0,                        16          ) \
-  X( fixed_position,     fixed_position,         Vector2,          ((Vector2){0}),           4           ) \
-  X( exclude_flags,      exclude_flags,             UI_box_flags,      0,                        16          ) \
+  /* lower               lower_alt                  type              init                              stack_size */ \
+  X( parent,             parent,                    UI_box_ptr,       0,                                16          ) \
+  X( flags,              flags,                     UI_box_flags,     (UI_BOX_FLAG_OVERFLOW),       16          ) \
+  X( fixed_position,     fixed_position,            Vector2,          ((Vector2){0}),                   4           ) \
+  X( exclude_flags,      exclude_flags,             UI_box_flags,     0,                                16          ) \
 
 #define UI_PROPERTIES \
   UI_STYLE_PROPERTIES \
@@ -534,9 +534,16 @@ func UI_context* ui_init(void) {
   ui->draw_arena  = arena_alloc(KB(16));
 
 #define X(lower, lower_alt, type, init, stack_size) \
-  arr_init_ex(ui->lower##_stack, ui->arena, stack_size);
+    arr_init_ex(ui->lower##_stack, ui->arena, stack_size);
   UI_PROPERTIES;
 #undef X
+
+//#define X(lower, lower_alt, type, init, stack_size) \
+//  type _tmp_init_##lower = init; \
+//  ui_push_prop(lower, _tmp_init_##lower);
+//  UI_STYLE_PROPERTIES;
+//  UI_OTHER_PROPERTIES;
+//#undef X
 
   ui->fonts[0] = GetFontDefault();
 
@@ -625,7 +632,7 @@ func UI_box* ui_make_transient_box(UI_context *ui) {
 
 func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key) {
 
-#define X(lower, lower_alt, type, init, stack_size) type cur_##lower = arr_last(ui->lower##_stack);
+#define X(lower, lower_alt, type, init, stack_size) type cur_##lower = ui_prop_top(lower);
   UI_PROPERTIES;
 #undef X
 
@@ -990,13 +997,14 @@ func void ui_begin_build(UI_context *ui) {
 
   ui->root = dummy;
 
-  ui_push_prop(parent, dummy);
-  ui_push_prop(flags, 0);
-  ui_push_prop(semantic_width,  ((UI_size){ .kind = UI_SIZE_NONE, }));
-  ui_push_prop(semantic_height, ((UI_size){ .kind = UI_SIZE_NONE, }));
-  ui_push_prop(text_align, (UI_text_align){ UI_TEXT_ALIGN_LEFT });
-  ui_push_prop(font_size, 0);
-  ui_push_prop(font_spacing, 0);
+#define X(lower, lower_alt, type, init, stack_size) \
+  ui_push_prop(lower, init); \
+  type cur_##lower = ui_prop_top(lower); \
+  memory_copy(&ui->root->lower_alt, &cur_##lower, sizeof(type));
+  UI_STYLE_PROPERTIES;
+  UI_OTHER_PROPERTIES;
+#undef X
+  ui_push_prop(parent, ui->root);
 
   ui_get_input(ui);
 
@@ -1258,11 +1266,11 @@ func void ui_end_build(UI_context *ui) {
   UI_PROFILE(ui_prof_time_to_calc_positions)
   { /* calculate the relative and then absolute positions of each box in pre order */
 
+    u32 layout_axis = 0;
+    u32 axis = 1;
+
     for(UI_box *node = ui->root; node;) {
       UI_box *parent = node->parent;
-
-      u32 layout_axis = node->child_layout_axis;
-      u32 axis = !layout_axis;
 
       f32 final_layout_axis_min = 0.0f;
       f32 final_axis_min = 0.0f;
@@ -1299,12 +1307,9 @@ func void ui_end_build(UI_context *ui) {
       f32 layout_view_offset = 0.0f;
       f32 view_offset = 0.0f;
 
-      if(node->parent) {
-        {
-          UI_box *parent = node->parent;
-          parent->view_bounds[layout_axis] += node->fixed_size[layout_axis];
-          parent->view_bounds[axis] = MAX(parent->view_bounds[axis], node->fixed_size[axis]);
-        }
+      if(parent) {
+        parent->view_bounds[layout_axis] += node->fixed_size[layout_axis];
+        parent->view_bounds[axis] = MAX(parent->view_bounds[axis], node->fixed_size[axis]);
 
         layout_view_offset = floor_f32(node->parent->view_offset[layout_axis]);
         view_offset = floor_f32(node->parent->view_offset[axis]);
@@ -1325,8 +1330,19 @@ func void ui_end_build(UI_context *ui) {
       node->fixed_position.y = node->final_rect_min[1];
 
       if(node->first) {
+        /* NOTE(jfd 28/07/2025)
+         *
+         * The view bounds are zeroed here because they need to be zeroed immediately before
+         * descending in to the children, as the view bounds are basically calculated as the union
+         * of child dimensions.
+         * 
+         */
+
         node->view_bounds[0] = 0;
         node->view_bounds[1] = 0;
+
+        layout_axis = node->child_layout_axis;
+        axis = !layout_axis;
 
         node = node->first;
 
@@ -1512,13 +1528,21 @@ func void ui_draw(UI_context *ui) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 1
+#if 0
     arena_scope(ui->temp) {
 
       Vector2 pos = { rec.x, rec.y };
 
       SetTextLineSpacing(1);
-      DrawTextEx(GetFontDefault(), (char*)str8f(ui->temp, "hash = %li\t\t\tsrc_str = %S", box->key.hash, box->key.src_str).s, pos, 10, 1.0, GREEN);
+      DrawTextEx(GetFontDefault(),
+          (char*)str8f(ui->temp,
+            "hash = %li\t\t\tsrc_str = %S"
+
+            ,
+            box->key.hash,
+            box->key.src_str
+            ).s,
+          pos, 10, 1.0, GREEN);
 
       SetTextLineSpacing(5);
       DrawRectangleLinesEx(rec, 1.0, RED);
