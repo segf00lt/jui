@@ -283,12 +283,13 @@ func UI_signal item_list_window(Game *gp, Item_list *list) {
     UI_BOX_FLAG_DRAW_BACKGROUND |
     UI_BOX_FLAG_MOUSE_CLICKABLE |
     UI_BOX_FLAG_DROP_SITE |
+    UI_BOX_FLAG_INVERT_SCROLL |
     0;
 
   UI_box *box;
   UI_size width = { .kind = UI_SIZE_PIXELS, .value = 200.0f, };
   //UI_size height = { .kind = UI_SIZE_CHILDREN_SUM };
-  UI_size height = { .kind = UI_SIZE_PIXELS, .value = 400.0f, };
+  UI_size height = { .kind = UI_SIZE_PIXELS, .value = 150.0f, };
 
   ui_child_layout_axis(UI_AXIS_Y)
     ui_semantic_width(width) ui_semantic_height(height)
@@ -379,41 +380,41 @@ func void game_update_and_draw(Game *gp) {
 
       UI_signal window_sig;
 
-      ui_flags(UI_BOX_FLAG_CLIP | UI_BOX_FLAG_VIEW_SCROLL | UI_BOX_FLAG_CLAMP_VIEW) ui_background_color(window_background_color)
+      ui_flags(UI_BOX_FLAG_CLIP | UI_BOX_FLAG_CLAMP_VIEW | UI_BOX_FLAG_VIEW_SCROLL) ui_background_color(window_background_color)
         window_sig = item_list_window(gp, list);
 
       list->sig = window_sig;
 
       UI_box *window_box = window_sig.box;
 
-        ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
-        {
+      ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
+      {
 
-          ui_parent(window_box)
-            for(Item_node *item = list->first, *next = 0; item; item = next) {
-              next = item->next;
+        ui_parent(window_box)
+          for(Item_node *item = list->first, *next = 0; item; item = next) {
+            next = item->next;
 
-              UI_signal item_sig;
+            UI_signal item_sig;
 
-              UI_size width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0, .strictness = 0 };
-              UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
+            UI_size width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0, .strictness = 0 };
+            UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
-              ui_semantic_width(width) ui_semantic_height(height)
-                item_sig = item_button(gp, item);
+            ui_semantic_width(width) ui_semantic_height(height)
+              item_sig = item_button(gp, item);
 
-              UI_box *item_box = item_sig.box;
+            UI_box *item_box = item_sig.box;
 
-              if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG && Vector2LengthSqr(ui_drag_delta(ui)) > 0) {
-                gp->dragging_item = item;
-                gp->dragging_item_pos.x = item_box->final_rect_min[0];
-                gp->dragging_item_pos.y = item_box->final_rect_min[1];
-                gp->draggin_item_size[0] = item_box->fixed_size[0];
-                gp->draggin_item_size[1] = item_box->fixed_size[1];
-                dll_remove(list->first, list->last, item);
-              }
+            if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG && Vector2LengthSqr(ui_drag_delta(ui)) > 0) {
+              gp->dragging_item = item;
+              gp->dragging_item_pos.x = item_box->final_rect_min[0];
+              gp->dragging_item_pos.y = item_box->final_rect_min[1];
+              gp->draggin_item_size[0] = item_box->fixed_size[0];
+              gp->draggin_item_size[1] = item_box->fixed_size[1];
+              dll_remove(list->first, list->last, item);
             }
+          }
 
-        }
+      }
 
     }
 

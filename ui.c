@@ -71,6 +71,7 @@
   X(KEYBOARD_CLICKABLE) \
   X(DROP_SITE) \
   X(SCROLL) \
+  X(INVERT_SCROLL) \
   X(VIEW_SCROLL_X) \
   X(VIEW_SCROLL_Y) \
   X(CLAMP_VIEW_X) \
@@ -735,8 +736,6 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
 
   UI_signal sig = { .box = box };
 
-  // TODO box stacking one on top of the other
-
   Rectangle box_rec =
   {
     .x = box->final_rect_min[0],
@@ -849,6 +848,11 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     delta[0] *= ui->scroll_rate;
     delta[1] *= ui->scroll_rate;
 
+    if(box->flags & UI_BOX_FLAG_INVERT_SCROLL) {
+      delta[0] *= -1.0f;
+      delta[1] *= -1.0f;
+    }
+
     if((box->flags & UI_BOX_FLAG_SCROLL) &&
         (ui->input_flags & UI_INPUT_FLAG_MOUSE_SCROLL) &&
         (ui->modifier_keys == 0 || ui->modifier_keys & UI_MOD_MASK_SHIFT) &&
@@ -884,29 +888,29 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       box->view_offset_target[0] += (f32)delta[0];
       box->view_offset_target[1] += (f32)delta[1];
 
-      // TODO animate view scrolling
-      box->view_offset[0] = box->view_offset_target[0];
-      box->view_offset[1] = box->view_offset_target[1];
-
       sig.flags |= UI_SIGNAL_FLAG_SCROLL;
     }
 
-    // TODO fix view clamping
     if(view_scrolled && box->flags & UI_BOX_FLAG_CLAMP_VIEW) {
       f32 max_view_offset_target[2] = {
-        CLAMP_BOT(0, box->view_bounds[0] - box->fixed_size[0]),
-        CLAMP_BOT(0, box->view_bounds[1] - box->fixed_size[1]),
+        MAX(0, box->view_bounds[0] - box->fixed_size[0]),
+        MAX(0, box->view_bounds[1] - box->fixed_size[1]),
       };
 
       if(box->flags & UI_BOX_FLAG_CLAMP_VIEW_X) {
-        box->view_offset_target[0] = Clamp(0, box->view_offset_target[0], max_view_offset_target[0]);
+        box->view_offset_target[0] = Clamp(box->view_offset_target[0], 0, max_view_offset_target[0]);
       }
 
       if(box->flags & UI_BOX_FLAG_CLAMP_VIEW_Y) {
-        box->view_offset_target[1] = Clamp(0, box->view_offset_target[1], max_view_offset_target[1]);
+        box->view_offset_target[1] = Clamp(box->view_offset_target[1], 0, max_view_offset_target[1]);
       }
 
     }
+
+    // TODO animate view scrolling
+    box->view_offset[0] = box->view_offset_target[0];
+    box->view_offset[1] = box->view_offset_target[1];
+
 
   } /* scrolling */
 
@@ -1294,7 +1298,14 @@ func void ui_end_build(UI_context *ui) {
 
       f32 layout_view_offset = 0.0f;
       f32 view_offset = 0.0f;
+
       if(node->parent) {
+        {
+          UI_box *parent = node->parent;
+          parent->view_bounds[layout_axis] += node->fixed_size[layout_axis];
+          parent->view_bounds[axis] = MAX(parent->view_bounds[axis], node->fixed_size[axis]);
+        }
+
         layout_view_offset = floor_f32(node->parent->view_offset[layout_axis]);
         view_offset = floor_f32(node->parent->view_offset[axis]);
       }
@@ -1310,14 +1321,15 @@ func void ui_end_build(UI_context *ui) {
       node->final_rect_max[0] = floor_f32(node->final_rect_max[0]);
       node->final_rect_max[1] = floor_f32(node->final_rect_max[1]);
 
-      node->view_bounds[layout_axis] = node->fixed_size[layout_axis];
-      node->view_bounds[axis] = node->fixed_size[axis];
-
       node->fixed_position.x = node->final_rect_min[0];
       node->fixed_position.y = node->final_rect_min[1];
 
       if(node->first) {
+        node->view_bounds[0] = 0;
+        node->view_bounds[1] = 0;
+
         node = node->first;
+
       } else if(node->next) {
         node = node->next;
       } else {
@@ -1496,7 +1508,6 @@ func void ui_draw(UI_context *ui) {
 
     }
 
-    // TODO fix clipping bug
     if(box->flags & UI_BOX_FLAG_CLIP) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
@@ -1516,20 +1527,28 @@ func void ui_draw(UI_context *ui) {
 
     if(box->first) {
       box = box->first;
-    } else if(box->next) {
-      box = box->next;
     } else {
-      while(box && !(box->next)) {
-        box = box->parent;
 
-        if(box && box->flags & UI_BOX_FLAG_CLIP) {
-          EndScissorMode();
+      if(box->flags & UI_BOX_FLAG_CLIP) {
+        EndScissorMode();
+      }
+
+      if(box->next) {
+        box = box->next;
+      } else {
+        while(box && !(box->next)) {
+          box = box->parent;
+
+          if(box && box->flags & UI_BOX_FLAG_CLIP) {
+            EndScissorMode();
+          }
+        }
+
+        if(box) {
+          box = box->next;
         }
       }
 
-      if(box) {
-        box = box->next;
-      }
     }
 
   } /* for(UI_box_node *node = ui->root; node;) */
