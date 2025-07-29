@@ -262,14 +262,17 @@
 
 //- rjf: doubly-linked-lists
 #define dll_insert_npz(nil,f,l,p,n,next,prev) (check_nil(nil,f) ? \
-((f) = (l) = (n), set_nil(nil,(n)->next), set_nil(nil,(n)->prev)) :\
+( (f) = (l) = (n), set_nil(nil,(n)->next), set_nil(nil,(n)->prev) ) :\
 check_nil(nil,p) ? \
-((n)->next = (f), (f)->prev = (n), (f) = (n), set_nil(nil,(n)->prev)) :\
+( (n)->next = (f), (f)->prev = (n), (f) = (n), set_nil(nil,(n)->prev) ) :\
 ((p)==(l)) ? \
-((l)->next = (n), (n)->prev = (l), (l) = (n), set_nil(nil, (n)->next)) :\
-(((!check_nil(nil,p) && check_nil(nil,(p)->next)) ? (0) : ((p)->next->prev = (n))), ((n)->next = (p)->next), ((p)->next = (n)), ((n)->prev = (p))))
+( (l)->next = (n), (n)->prev = (l), (l) = (n), set_nil(nil, (n)->next) ) :\
+( ( (!check_nil(nil,p) && check_nil(nil,(p)->next)) ? (0) : ( (p)->next->prev = (n) ) ), ((n)->next = (p)->next), ((p)->next = (n)), ((n)->prev = (p)) ) )
+
 #define dll_push_back_npz(nil,f,l,n,next,prev) dll_insert_npz(nil,f,l,l,n,next,prev)
+
 #define dll_push_front_npz(nil,f,l,n,next,prev) dll_insert_npz(nil,l,f,f,n,prev,next)
+
 #define dll_remove_npz(nil,f,l,n,next,prev) (((n) == (f) ? (f) = (n)->next : (0)),\
 ((n) == (l) ? (l) = (l)->prev : (0)),\
 (check_nil(nil,(n)->prev) ? (0) :\

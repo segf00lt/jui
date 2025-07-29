@@ -1195,7 +1195,8 @@ func void ui_end_build(UI_context *ui) {
   for(int axis = 0; axis < 2; axis++) {
     UI_PROFILE(ui_prof_time_to_do_1st_pass) {
 
-      UI_PROFILE(ui_prof_time_to_calc_absolute_sized_boxes) { /* visit nodes with UI_SIZE_PIXELS or UI_SIZE_TEXT_CONTENT */
+      UI_PROFILE(ui_prof_time_to_calc_absolute_sized_boxes)
+      { /* visit nodes with UI_SIZE_PIXELS or UI_SIZE_TEXT_CONTENT */
 
         for(UI_box *node = ui->root; node;) {
 
@@ -1212,9 +1213,10 @@ func void ui_end_build(UI_context *ui) {
               arena_scope(ui->build_arena) {
 
                 Vector2 text_size =
-                  MeasureTextEx(
+                  MeasureTextPro(
                       ui->fonts[node->font_id],
-                      cstr_copy_str8(ui->build_arena, node->text),
+                      (char*)node->text.s,
+                      (int)node->text.len,
                       node->font_size,
                       node->font_spacing);
 
@@ -1242,7 +1244,8 @@ func void ui_end_build(UI_context *ui) {
 
       } /* visit nodes with UI_SIZE_PIXELS or UI_SIZE_TEXT_CONTENT */
 
-      UI_PROFILE(ui_prof_time_to_calc_percent_sized_boxes) { /* visit nodes with UI_SIZE_PERCENT_OF_PARENT in pre order */
+      UI_PROFILE(ui_prof_time_to_calc_percent_sized_boxes)
+      { /* visit nodes with UI_SIZE_PERCENT_OF_PARENT in pre order */
 
         for(UI_box *node = ui->root; node;) {
 
@@ -1279,7 +1282,8 @@ func void ui_end_build(UI_context *ui) {
 
       } /* visit nodes with UI_SIZE_PERCENT_OF_PARENT in pre order */
 
-      UI_PROFILE(ui_prof_time_to_calc_sum_sized_boxes) {
+      UI_PROFILE(ui_prof_time_to_calc_sum_sized_boxes)
+      {
         ui_calc_downward_dependent_sizes(ui->root, axis, ui->root->child_layout_axis);
       }
 

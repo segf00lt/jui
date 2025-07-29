@@ -280,7 +280,7 @@ func UI_signal item_list_window(Game *gp, Item_list *list) {
   UI_box_flags flags =
     UI_BOX_FLAG_FLOATING |
     UI_BOX_FLAG_DRAW_BACKGROUND |
-    UI_BOX_FLAG_DROP_SITE |
+    //UI_BOX_FLAG_DROP_SITE |
     UI_BOX_FLAG_INVERT_SCROLL |
     0;
 
@@ -400,7 +400,7 @@ func void game_update_and_draw(Game *gp) {
             UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
             ui_semantic_width(width) ui_semantic_height(height)
-  //ui_flags(UI_BOX_FLAG_DROP_SITE)
+              ui_flags(UI_BOX_FLAG_DROP_SITE)
               ui_border_size(2.0f)
               ui_corner_radius(0.2f)
               item_sig = item_button(gp, item);
@@ -477,19 +477,90 @@ func void game_update_and_draw(Game *gp) {
         for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
           Item_list *list = &gp->item_lists[list_i];
 
+#if 0
            if(ui_key_match(list->sig.box->key, ui_drop_hot_box_key(ui))) {
              Item_node *dropped_item = gp->dragging_item;
              dll_push_back(list->first, list->last, dropped_item);
            }
-          //for(Item_node *node = list->first; node; node = node->next) {
+#else
+          for(Item_node *node = list->first; node; node = node->next) {
 
-          //  if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key(ui))) {
-          //    Item_node *dropped_item = gp->dragging_item;
-          //    dll_insert(list->first, list->last, node->prev, dropped_item);
-          //    //dll_push_back(list->first, list->last, dropped_item);
-          //  }
+            if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key(ui))) {
+              Item_node *dropped_item = gp->dragging_item;
 
-          //}
+
+#if 0
+#if !1
+
+
+
+              (
+               ((list->first) == 0 || (list->first) == 0) ?
+               ( (list->first) = (list->last) = (dropped_item), (((dropped_item)->next) = 0), (((dropped_item)->prev) = 0) ) :
+               ((node->prev) == 0 || (node->prev) == 0) ?
+               ( (dropped_item)->next = (list->first), (list->first)->prev = (dropped_item), (list->first) = (dropped_item), (((dropped_item)->prev) = 0) ) :
+               ((node->prev)==(list->last)) ?
+               ( (list->last)->next = (dropped_item), (dropped_item)->prev = (list->last), (list->last) = (dropped_item), (((dropped_item)->next) = 0) ) :
+               ( ( (!((node->prev) == 0 || (node->prev) == 0) && (((node->prev)->next) == 0 || ((node->prev)->next) == 0)) ?
+                   (0) :
+                   ( (node->prev)->next->prev = (dropped_item) ) ), ((dropped_item)->next = (node->prev)->next), ((node->prev)->next = (dropped_item)), ((dropped_item)->prev = (node->prev)) ) );
+
+
+
+
+
+
+
+
+
+
+
+              (
+               ((list->first) == 0 || (list->first) == 0) ?
+               ( (list->first) = (list->last) = (dropped_item), (((dropped_item)->next) = 0), (((dropped_item)->prev) = 0) ) :
+               ((node->prev) == 0 || (node->prev) == 0) ?
+               ( (dropped_item)->next = (list->first), (list->first)->prev = (dropped_item), (list->first) = (dropped_item), (((dropped_item)->prev) = 0) ) :
+               ((node->prev)==(list->last)) ?
+               ( (list->last)->next = (dropped_item), (dropped_item)->prev = (list->last), (list->last) = (dropped_item), (((dropped_item)->next) = 0) ) :
+               ( ( (!((node->prev) == 0 || (node->prev) == 0) && (((node->prev)->next) == 0 || ((node->prev)->next) == 0)) ?
+                   (0) :
+                   ( (node->prev)->next->prev = (dropped_item) ) ), ((dropped_item)->next = (node->prev)->next), ((node->prev)->next = (dropped_item)), ((dropped_item)->prev = (node->prev)) ) );
+
+#endif
+              {
+                Item_node *nil = 0;
+                Item_node *f = list->first;
+                Item_node *l = list->last;
+                Item_node *p = node;
+                Item_node *n = dropped_item;
+
+                (check_nil(nil, f) ?
+                 ( (f) = (l) = (n), set_nil(nil,(n)->next), set_nil(nil,(n)->prev) ) :
+                 check_nil(nil,p) ? 
+                 ( (n)->next = (f), (f)->prev = (n), (f) = (n), set_nil(nil,(n)->prev) ) :
+                 ((p)==(l)) ? 
+                 ( (l)->next = (n), (n)->prev = (l), (l) = (n), set_nil(nil, (n)->next) ) :
+                 ( ( (!check_nil(nil,p) && check_nil(nil,(p)->next)) ?
+                     (0) :
+                     ( (p)->next->prev = (n) ) ), ((n)->next = (p)->next), ((p)->next = (n)), ((n)->prev = (p)) ) );
+
+              }
+#else 
+              /* NOTE(jfd 29/07/25)
+               *
+               * Passing node->prev to dll_insert causes weird evaluation and doesn't insert properly
+               * but if I literally paste the expansion of dll_insert in to the text it works.
+               * This works because I actually assigned the addresses to variables;
+               * Maybe consider making do { } while(0) versions of those macros
+               */
+              Item_node *prev = node->prev;
+
+              dll_insert(list->first, list->last, prev, dropped_item);
+#endif
+            }
+
+          }
+#endif
         }
         gp->dragging_item = 0;
       }
