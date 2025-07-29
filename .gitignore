@@ -18,6 +18,7 @@ aseprite/atlas.json
 *.log
 nob
 nob.old
+meta
 ui_test.js
 ui_test.html
 ui_test.wasm

@@ -264,7 +264,7 @@ func UI_signal item_button(Game *gp, Item_node *item) {
 
   UI_signal sig = {0}; 
 
-  ui_text_align(UI_TEXT_ALIGN_CENTER)
+    ui_text_align(UI_TEXT_ALIGN_CENTER)
     ui_padding(4.0f)
     ui_font_size(20.0f)
     ui_font_spacing(2.0f)
@@ -280,7 +280,6 @@ func UI_signal item_list_window(Game *gp, Item_list *list) {
   UI_box_flags flags =
     UI_BOX_FLAG_FLOATING |
     UI_BOX_FLAG_DRAW_BACKGROUND |
-    UI_BOX_FLAG_MOUSE_CLICKABLE |
     UI_BOX_FLAG_DROP_SITE |
     UI_BOX_FLAG_INVERT_SCROLL |
     0;
@@ -363,16 +362,17 @@ func void game_update_and_draw(Game *gp) {
     Color window_background_color = ColorBrightness(BLUE, -0.4f);
 
     if(gp->dragging_item) {
-      ui->permission_flags |=
+      ui_permission_flags_top() |=
         UI_PERMISSION_FLAG_CLICKS_RIGHT |
         UI_PERMISSION_FLAG_CLICKS_MIDDLE |
         0;
     } else {
-      ui->permission_flags &=
+      ui_permission_flags_top() &=
         ~UI_PERMISSION_FLAG_CLICKS_RIGHT &
         ~UI_PERMISSION_FLAG_CLICKS_MIDDLE &
         1;
     }
+
 
     for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
       Item_list *list = &gp->item_lists[list_i];
@@ -399,6 +399,7 @@ func void game_update_and_draw(Game *gp) {
             UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
             ui_semantic_width(width) ui_semantic_height(height)
+  //ui_flags(UI_BOX_FLAG_DROP_SITE)
               ui_border_size(2.0f)
               ui_corner_radius(0.2f)
               item_sig = item_button(gp, item);
@@ -427,7 +428,8 @@ func void game_update_and_draw(Game *gp) {
 
       UI_signal dragging_sig;
 
-      ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
+      ui_flags(UI_BOX_FLAG_FLOATING)
+        ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
         ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
         ui_fixed_width(gp->draggin_item_size[0]) ui_fixed_height(gp->draggin_item_size[1])
         ui_corner_radius(1.0f)
@@ -437,17 +439,26 @@ func void game_update_and_draw(Game *gp) {
         for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
           Item_list *list = &gp->item_lists[list_i];
 
-          if(ui_key_match(list->sig.box->key, ui_drop_hot_box_key(ui))) {
-            Item_node *dropped_item = gp->dragging_item;
-            dll_push_back(list->first, list->last, dropped_item);
-          }
+           if(ui_key_match(list->sig.box->key, ui_drop_hot_box_key(ui))) {
+             Item_node *dropped_item = gp->dragging_item;
+             dll_push_back(list->first, list->last, dropped_item);
+           }
+          //for(Item_node *node = list->first; node; node = node->next) {
 
+          //  if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key(ui))) {
+          //    Item_node *dropped_item = gp->dragging_item;
+          //    dll_insert(list->first, list->last, node->prev, dropped_item);
+          //    //dll_push_back(list->first, list->last, dropped_item);
+          //  }
+
+          //}
         }
         gp->dragging_item = 0;
       }
 
     }
 
+    //ui->permission_flags = 0;
 #endif
 
 #if 1

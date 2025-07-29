@@ -69,7 +69,7 @@ struct __Slice_header {
 
 #define arr_first(array) ((array).d[0])
 
-#define arr_last(array) ( ((array).count > 0) ? ((array).d[(array).count-1]) : ((array).d[0]) )
+#define arr_last(array) ( (array).d[ ( ((array).count > 0) ? ((array).count - 1) : (0) ) ] )
 
 #define arr_to_slice(T, array) (*(Slice(T)*)(&(array)))
 #define carray_to_slice(T, carray) ((Slice(T)){ .d = (T*)carray, .count = (sizeof(carray)/sizeof(T)) })
