@@ -380,6 +380,7 @@ func void game_update_and_draw(Game *gp) {
       UI_signal window_sig;
 
       ui_flags(UI_BOX_FLAG_CLIP | UI_BOX_FLAG_CLAMP_VIEW | UI_BOX_FLAG_VIEW_SCROLL) ui_background_color(window_background_color)
+        ui_exclude_flags(UI_BOX_FLAG_FLOATING)
         window_sig = item_list_window(gp, list);
 
       list->sig = window_sig;
@@ -424,15 +425,52 @@ func void game_update_and_draw(Game *gp) {
 
     }
 
+#if 1
+    Vector2 window_pos1 =
+    {
+      .x = 20,
+      .y = 10,
+    };
+
+
+    ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(window_pos1)
+      ui_exclude_flags(UI_BOX_FLAG_FLOATING)
+      ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
+      ui_child_layout_axis(UI_AXIS_Y)
+      {
+        UI_box *container1 = ui_make_box_from_str(ui, 0, str8_lit("##container1"));
+
+        ui_parent(container1)
+          ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
+          ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
+          ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 }))
+          ui_text_align((UI_text_align){ UI_TEXT_ALIGN_CENTER })
+          ui_padding(4.0f)
+          ui_font_size(20)
+          ui_font_spacing(2.0f)
+          ui_border_size(1.0f)
+          {
+            ui_make_box_from_str(ui, 0, str8_lit("hello world##0_0"));
+            ui_make_box_from_str(ui, 0, str8_lit("my##0_1"));
+            ui_make_box_from_str(ui, 0, str8_lit("name##0_2"));
+            ui_make_box_from_str(ui, 0, str8_lit("is##0_3"));
+            ui_make_box_from_str(ui, 0, str8_lit("joao##0_4"));
+
+          }
+
+      }
+#endif
+
     if(gp->dragging_item) {
 
       UI_signal dragging_sig;
 
       ui_flags(UI_BOX_FLAG_FLOATING)
+        //ui_exclude_flags(UI_BOX_FLAG_FLOATING)
         ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
         ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
         ui_fixed_width(gp->draggin_item_size[0]) ui_fixed_height(gp->draggin_item_size[1])
-        ui_corner_radius(1.0f)
+        ui_corner_radius(0.2f)
         dragging_sig = item_button(gp, gp->dragging_item);
 
       if(dragging_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE) {
@@ -462,47 +500,12 @@ func void game_update_and_draw(Game *gp) {
 #endif
 
 #if 1
-#if 0
-    Vector2 window_pos1 =
-    {
-      .x = 20,
-      .y = 10,
-    };
-
-
-    ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(window_pos1)
-      ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
-      ui_child_layout_axis(UI_AXIS_Y)
-      {
-        UI_box *container1 = ui_make_box_from_str(ui, 0, str8_lit("##container1"));
-
-        ui_parent(container1)
-          ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
-          ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
-          ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 }))
-          ui_text_align((UI_text_align){ UI_TEXT_ALIGN_CENTER })
-          ui_padding(4.0f)
-          ui_font_size(20)
-          ui_font_spacing(2.0f)
-          ui_border_size(1.0f)
-          {
-            ui_make_box_from_str(ui, 0, str8_lit("hello world##0_0"));
-            ui_make_box_from_str(ui, 0, str8_lit("my##0_1"));
-            ui_make_box_from_str(ui, 0, str8_lit("name##0_2"));
-            ui_make_box_from_str(ui, 0, str8_lit("is##0_3"));
-            ui_make_box_from_str(ui, 0, str8_lit("joao##0_4"));
-
-          }
-
-      }
-#endif
-
 #if 1
     ui_child_layout_axis(1)
       ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300, }))
       ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250,  }))
       ui_border_color(RED) ui_border_size(2.0f)
-      ui_flags(UI_BOX_FLAG_FLOATING_X | 0) ui_fixed_position(window_pos2)
+      ui_flags(UI_BOX_FLAG_FLOATING | 0) ui_fixed_position(window_pos2)
       {
         UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
 

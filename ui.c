@@ -1381,95 +1381,61 @@ func void ui_end_build(UI_context *ui) {
   UI_PROFILE(ui_prof_time_to_calc_positions)
   { /* calculate the relative and then absolute positions of each box in pre order */
 
-    u32 layout_axis = 0;
-    u32 axis = 1;
+    for(UI_axis axis = UI_AXIS_X; axis < UI_AXIS_COUNT; axis++) {
 
-    for(UI_box *node = ui->root; node;) {
-      UI_box *parent = node->parent;
+      for(UI_box *node = ui->root; node;) {
 
-      f32 final_layout_axis_min = 0.0f;
-      f32 final_axis_min = 0.0f;
+        f32 layout_position = 0;
+        f32 bounds = 0;
 
-      if(node->flags & (UI_BOX_FLAG_FLOATING_X << layout_axis)) {
-        final_layout_axis_min = (&(node->fixed_position.x))[layout_axis];
-      } else {
-        f32 parent_layout_axis_pos = 0.0f;
-        if(parent) {
-          parent_layout_axis_pos = parent->final_rect_min[layout_axis];
+        for(UI_box *child = node->first; child; child = child->next) {
+          // f32 original_pos = MIN(child->final_rect_min[axis], child->final_rect_max[axis]);
+
+          if(!(child->flags & (UI_BOX_FLAG_FLOATING_X << axis))) {
+            (&child->fixed_position.x)[axis] = layout_position;
+
+            if(node->child_layout_axis == axis) {
+              layout_position += child->fixed_size[axis];
+              bounds += child->fixed_size[axis];
+            } else {
+              bounds = MAX(bounds, child->fixed_size[axis]);
+            }
+
+          }
+
+          // TODO ryan puts animation here
+
+          {
+            child->final_rect_min[axis] = node->final_rect_min[axis] + (&child->fixed_position.x)[axis] - floor_f32(node->view_offset[axis]);
+          }
+
+          child->final_rect_max[axis] = child->final_rect_min[axis] + child->fixed_size[axis];
+
+          child->final_rect_min[0] = floor_f32(child->final_rect_min[0]);
+          child->final_rect_min[1] = floor_f32(child->final_rect_min[1]);
+          child->final_rect_max[0] = floor_f32(child->final_rect_max[0]);
+          child->final_rect_max[1] = floor_f32(child->final_rect_max[1]);
+
+          // TODO ryan puts position delta calc for the animation here
+
         }
 
-        f32 rel_layout_axis_pos = 0.0f;
-        if(node->prev) {
-          rel_layout_axis_pos = node->prev->computed_rel_pos[layout_axis] + node->prev->fixed_size[layout_axis];
+        {
+          node->view_bounds[axis] = bounds;
         }
 
-        node->computed_rel_pos[layout_axis] = rel_layout_axis_pos;
-
-        final_layout_axis_min = parent_layout_axis_pos + rel_layout_axis_pos;
-      }
-
-      if(node->flags & (UI_BOX_FLAG_FLOATING_X << axis)) {
-        final_axis_min = (&(node->fixed_position.x))[axis];
-      } else {
-        f32 parent_axis_pos = 0.0f;
-        if(parent) {
-          parent_axis_pos = parent->final_rect_min[axis];
+        if(node->first) {
+          node = node->first;
+        } else if(node->next) {
+          node = node->next;
+        } else {
+          while(node && !(node->next)) {
+            node = node->parent;
+          }
+          if(node) node = node->next;
         }
 
-        final_axis_min = parent_axis_pos;
       }
-
-      f32 layout_view_offset = 0.0f;
-      f32 view_offset = 0.0f;
-
-      if(parent) {
-        parent->view_bounds[layout_axis] += node->fixed_size[layout_axis];
-        parent->view_bounds[axis] = MAX(parent->view_bounds[axis], node->fixed_size[axis]);
-
-        layout_view_offset = floor_f32(node->parent->view_offset[layout_axis]);
-        view_offset = floor_f32(node->parent->view_offset[axis]);
-      }
-
-      node->final_rect_min[layout_axis] = final_layout_axis_min - layout_view_offset;
-      node->final_rect_min[axis] = final_axis_min - view_offset;
-
-      node->final_rect_max[layout_axis] = final_layout_axis_min + node->fixed_size[layout_axis] - layout_view_offset;
-      node->final_rect_max[axis] = final_axis_min + node->fixed_size[axis] - view_offset;
-
-      node->final_rect_min[0] = floor_f32(node->final_rect_min[0]);
-      node->final_rect_min[1] = floor_f32(node->final_rect_min[1]);
-      node->final_rect_max[0] = floor_f32(node->final_rect_max[0]);
-      node->final_rect_max[1] = floor_f32(node->final_rect_max[1]);
-
-      node->fixed_position.x = node->final_rect_min[0];
-      node->fixed_position.y = node->final_rect_min[1];
-
-      if(node->first) {
-        /* NOTE(jfd 28/07/2025)
-         *
-         * The view bounds are zeroed here because they need to be zeroed immediately before
-         * descending in to the children, as the view bounds are basically calculated as the union
-         * of child dimensions.
-         * 
-         */
-
-        node->view_bounds[0] = 0;
-        node->view_bounds[1] = 0;
-
-        layout_axis = node->child_layout_axis;
-        axis = !layout_axis;
-
-        node = node->first;
-
-      } else if(node->next) {
-        node = node->next;
-      } else {
-        while(node && !(node->next)) {
-          node = node->parent;
-        }
-        if(node) node = node->next;
-      }
-
     }
 
   } /* calculate the relative and then absolute positions of each box in pre order */
@@ -1643,7 +1609,7 @@ func void ui_draw(UI_context *ui) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 1
+#if 0
     arena_scope(ui->temp) {
 
       Vector2 pos = { rec.x, rec.y };
@@ -1651,11 +1617,13 @@ func void ui_draw(UI_context *ui) {
       SetTextLineSpacing(1);
       DrawTextEx(GetFontDefault(),
           (char*)str8f(ui->temp,
-            "hash = %li\t\t\tsrc_str = %S"
-
+            "x = %f\ty = %f\n\n"
+            "hash = %li\t\t\tsrc_str = %S\n"
             ,
             box->key.hash,
-            box->key.src_str
+            box->key.src_str,
+            box->fixed_position.x,
+            box->fixed_position.y
             ).s,
           pos, 10, 1.0, GREEN);
 
