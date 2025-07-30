@@ -355,6 +355,7 @@ typedef uint64_t b64;
 
 typedef void* void_ptr;
 typedef char* char_ptr;
+typedef char* Cstr;
 
 typedef enum Weekday {
   WEEKDAY_SUN = 0,

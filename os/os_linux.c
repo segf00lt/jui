@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <time.h>
+#include <errno.h>
 
 #ifdef PATH_MAX
 #define OS_PATH_LEN PATH_MAX
@@ -296,6 +297,20 @@ end:
   }
 
   return result;
+}
+
+func b32 os_make_dir(char *path) {
+  int result = mkdir(path, 0755);
+
+  if(result < 0) {
+    if(errno == EEXIST) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  return 1;
 }
 
 #endif

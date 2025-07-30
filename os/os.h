@@ -47,4 +47,6 @@ void os_file_iter_end(OS_file_iter *iter);
 
 Str8 os_file_name_from_path(Str8 path);
 
+b32 os_make_dir(char *path);
+
 #endif

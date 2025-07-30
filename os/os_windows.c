@@ -105,4 +105,18 @@ b32 os_remove_file(Arena *a, Str8 path) {
   return result;
 }
 
+func b32 os_make_dir(char *path) {
+  int result = mkdir(path);
+
+  if(result < 0) {
+    if(errno == EEXIST) {
+      return 1;
+    }
+
+    return 0;
+  }
+
+  return 1;
+}
+
 #endif

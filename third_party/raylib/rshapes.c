@@ -1666,30 +1666,38 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
           \\ P13              P12 //
            P5 ================== P4
     */
+    
+    /* NOTE(~jfd 30/07/2025)
+     *
+     * Unlike DrawRectangleRoundedLinesEx() this function does not put the border lines centered on the rectangle
+     * bounds, but instead outside of them. This is done so that on lower res screens you don't get weird looking squiggles
+     * caused by fractional pixel coordinates.
+     *
+     */
     Vector2 point[16] = {
-        {(float)rec.x + innerRadius[0] + 0.5f, rec.y - lineThick + 0.5f},
-        {(float)(rec.x + rec.width) - innerRadius[1] - 0.5f, rec.y - lineThick + 0.5f},
-        {rec.x + rec.width + lineThick - 0.5f, (float)rec.y + innerRadius[1] + 0.5f}, // PO, P1, P2
-        {rec.x + rec.width + lineThick - 0.5f, (float)(rec.y + rec.height) - innerRadius[2] - 0.5f},
-        {(float)(rec.x + rec.width) - innerRadius[2] - 0.5f, rec.y + rec.height + lineThick - 0.5f}, // P3, P4
-        {(float)rec.x + innerRadius[3] + 0.5f, rec.y + rec.height + lineThick - 0.5f},
-        {rec.x - lineThick + 0.5f, (float)(rec.y + rec.height) - innerRadius[3] - 0.5f},
-        {rec.x - lineThick + 0.5f, (float)rec.y + innerRadius[0] + 0.5f}, // P5, P6, P7
-        {(float)rec.x + innerRadius[0] + 0.5f, rec.y + 0.5f},
-        {(float)(rec.x + rec.width) - innerRadius[1] - 0.5f, rec.y + 0.5f}, // P8, P9
-        {rec.x + rec.width - 0.5f, (float)rec.y + innerRadius[1] + 0.5f},
-        {rec.x + rec.width - 0.5f, (float)(rec.y + rec.height) - innerRadius[2] - 0.5f}, // P10, P11
-        {(float)(rec.x + rec.width) - innerRadius[2] - 0.5f, rec.y + rec.height - 0.5f},
-        {(float)rec.x + innerRadius[3] + 0.5f, rec.y + rec.height - 0.5f}, // P12, P13
-        {rec.x + 0.5f, (float)(rec.y + rec.height) - innerRadius[3] - 0.5f},
-        {rec.x + 0.5f, (float)rec.y + innerRadius[0] + 0.5f} // P14, P15
+        {(float)rec.x + innerRadius[0], rec.y - lineThick},
+        {(float)(rec.x + rec.width) - innerRadius[1], rec.y - lineThick},
+        {rec.x + rec.width + lineThick, (float)rec.y + innerRadius[1]}, // PO, P1, P2
+        {rec.x + rec.width + lineThick, (float)(rec.y + rec.height) - innerRadius[2]},
+        {(float)(rec.x + rec.width) - innerRadius[2], rec.y + rec.height + lineThick}, // P3, P4
+        {(float)rec.x + innerRadius[3], rec.y + rec.height + lineThick},
+        {rec.x - lineThick, (float)(rec.y + rec.height) - innerRadius[3]},
+        {rec.x - lineThick, (float)rec.y + innerRadius[0]}, // P5, P6, P7
+        {(float)rec.x + innerRadius[0], rec.y},
+        {(float)(rec.x + rec.width) - innerRadius[1], rec.y}, // P8, P9
+        {rec.x + rec.width, (float)rec.y + innerRadius[1]},
+        {rec.x + rec.width, (float)(rec.y + rec.height) - innerRadius[2]}, // P10, P11
+        {(float)(rec.x + rec.width) - innerRadius[2], rec.y + rec.height},
+        {(float)rec.x + innerRadius[3], rec.y + rec.height}, // P12, P13
+        {rec.x, (float)(rec.y + rec.height) - innerRadius[3]},
+        {rec.x, (float)rec.y + innerRadius[0]} // P14, P15
     };
 
     const Vector2 centers[4] = {
-        {(float)rec.x + innerRadius[0] + 0.5f, (float)rec.y + innerRadius[0] + 0.5f},
-        {(float)(rec.x + rec.width) - innerRadius[1] - 0.5f, (float)rec.y + innerRadius[1] + 0.5f}, // P16, P17
-        {(float)(rec.x + rec.width) - innerRadius[2] - 0.5f, (float)(rec.y + rec.height) - innerRadius[2] - 0.5f},
-        {(float)rec.x + innerRadius[3] + 0.5f, (float)(rec.y + rec.height) - innerRadius[3] - 0.5f} // P18, P19
+        {(float)rec.x + innerRadius[0], (float)rec.y + innerRadius[0]},
+        {(float)(rec.x + rec.width) - innerRadius[1], (float)rec.y + innerRadius[1]}, // P16, P17
+        {(float)(rec.x + rec.width) - innerRadius[2], (float)(rec.y + rec.height) - innerRadius[2]},
+        {(float)rec.x + innerRadius[3], (float)(rec.y + rec.height) - innerRadius[3]} // P18, P19
     };
 
     const float angles[4] = { 180.0f, 270.0f, 0.0f, 90.0f };

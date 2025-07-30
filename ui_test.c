@@ -116,7 +116,7 @@ void game_reset(Game *gp);
 
 UI_signal item_button(Game *gp, Item_node *item);
 UI_signal ui_button(UI_context *ui, Str8 label);
-UI_signal item_list_window(Game *gp, Item_list *list);
+UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height);
 void ui_spacer(UI_context *ui, f32 size);
 
 /*
@@ -255,6 +255,7 @@ func void game_reset(Game *gp) {
 
 func void ui_spacer(UI_context *ui, f32 size) {
   ui_flags(0)
+    ui_exclude_flags(UI_BOX_FLAG_ALL)
     ui_semantic_size(((UI_size){ .kind = UI_SIZE_PIXELS, .value = size, .strictness = 1.0f }))
     ui_make_transient_box(ui);
 }
@@ -274,38 +275,62 @@ func UI_signal item_button(Game *gp, Item_node *item) {
   return sig;
 }
 
-func UI_signal item_list_window(Game *gp, Item_list *list) {
+func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height) {
   UI_context *ui = gp->ui;
 
   UI_box_flags flags =
     UI_BOX_FLAG_FLOATING |
     UI_BOX_FLAG_DRAW_BACKGROUND |
+    //UI_BOX_FLAG_CLIP |
     //UI_BOX_FLAG_DROP_SITE |
-    UI_BOX_FLAG_INVERT_SCROLL |
     0;
 
-  UI_box *box;
-  UI_size width = { .kind = UI_SIZE_PIXELS, .value = 200.0f, };
-  //UI_size height = { .kind = UI_SIZE_CHILDREN_SUM };
-  UI_size height = { .kind = UI_SIZE_PIXELS, .value = 150.0f, };
+  f32 padding = 40.0f;
 
-  ui_child_layout_axis(UI_AXIS_Y)
-    ui_semantic_width(width) ui_semantic_height(height)
+  UI_box *main_box;
+  UI_box *inner_container_box = 0;
+  UI_size main_width = { .kind = UI_SIZE_PIXELS, .value = width, .strictness = 1.0f };
+  UI_size main_height = { .kind = UI_SIZE_PIXELS, .value = height, .strictness = 1.0f };
+  UI_size fit = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.0f, };
+  UI_size sum = { .kind = UI_SIZE_CHILDREN_SUM, .value = 0.0f, .strictness = 0.0f, };
+
+  ui_flags(flags)
+    ui_exclude_flags(UI_BOX_FLAG_OVERFLOW)
+    ui_child_layout_axis(UI_AXIS_Y)
+    ui_semantic_width(main_width) ui_semantic_height(main_height)
     ui_fixed_position(list->pos)
 
-    box = ui_make_box_from_str(gp->ui, flags, list->id);
+    main_box = ui_make_box_from_key(gp->ui, flags, ui_key_nil());
 
-  UI_signal sig = ui_signal_from_box(gp->ui, box);
+  ui_parent(main_box)
+  {
+    ui_spacer(ui, padding);
 
-  Color background_color = box->background_color;
+    UI_box *box;
+    ui_semantic_size(sum)
+      box = ui_make_box_from_key(gp->ui, 0, ui_key_nil());
 
-  if(gp->dragging_item) {
-    if(ui_key_match(ui_hot_box_key(ui), box->key)) {
-      box->background_color = ColorBrightness(background_color, 0.15f);
-    }
+    ui_child_layout_axis(UI_AXIS_X) ui_semantic_size(fit)
+      ui_parent(box)
+      {
+        ui_spacer(ui, padding);
+
+        ui_child_layout_axis(UI_AXIS_Y)
+          ui_semantic_width(sum)
+          inner_container_box =
+          ui_make_box_from_str(gp->ui,
+              UI_BOX_FLAG_INVERT_SCROLL | UI_BOX_FLAG_CLAMP_VIEW | UI_BOX_FLAG_VIEW_SCROLL, list->id);
+
+        ui_spacer(ui, padding);
+      }
+
+    ui_spacer(ui, padding);
   }
 
-  return sig;
+  UI_signal inner_sig = ui_signal_from_box(gp->ui, inner_container_box);
+  //UI_signal sig = ui_signal_from_box(gp->ui, main_box);
+
+  return inner_sig;
 }
 
 func UI_signal ui_button(UI_context *ui, Str8 label) {
@@ -379,11 +404,9 @@ func void game_update_and_draw(Game *gp) {
 
       UI_signal window_sig;
 
-      ui_flags(UI_BOX_FLAG_CLIP | UI_BOX_FLAG_CLAMP_VIEW | UI_BOX_FLAG_VIEW_SCROLL) ui_background_color(window_background_color)
-        ui_exclude_flags(UI_BOX_FLAG_FLOATING)
-        window_sig = item_list_window(gp, list);
-
-      list->sig = window_sig;
+      ui_background_color(window_background_color)
+        //ui_exclude_flags(UI_BOX_FLAG_FLOATING)
+        window_sig = item_list_window(gp, list, 250, 200);
 
       UI_box *window_box = window_sig.box;
 
@@ -406,7 +429,7 @@ func void game_update_and_draw(Game *gp) {
               item_sig = item_button(gp, item);
 
             if(next) {
-              ui_spacer(ui, 4);
+              ui_spacer(ui, 5);
             }
 
             UI_box *item_box = item_sig.box;
@@ -425,7 +448,7 @@ func void game_update_and_draw(Game *gp) {
 
     }
 
-#if 1
+#if 0
     Vector2 window_pos1 =
     {
       .x = 20,
@@ -470,6 +493,7 @@ func void game_update_and_draw(Game *gp) {
         ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
         ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
         ui_fixed_width(gp->draggin_item_size[0]) ui_fixed_height(gp->draggin_item_size[1])
+        ui_border_size(2.0f)
         ui_corner_radius(0.2f)
         dragging_sig = item_button(gp, gp->dragging_item);
 
@@ -488,65 +512,7 @@ func void game_update_and_draw(Game *gp) {
             if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key(ui))) {
               Item_node *dropped_item = gp->dragging_item;
 
-
-#if 0
-#if !1
-
-
-
-              (
-               ((list->first) == 0 || (list->first) == 0) ?
-               ( (list->first) = (list->last) = (dropped_item), (((dropped_item)->next) = 0), (((dropped_item)->prev) = 0) ) :
-               ((node->prev) == 0 || (node->prev) == 0) ?
-               ( (dropped_item)->next = (list->first), (list->first)->prev = (dropped_item), (list->first) = (dropped_item), (((dropped_item)->prev) = 0) ) :
-               ((node->prev)==(list->last)) ?
-               ( (list->last)->next = (dropped_item), (dropped_item)->prev = (list->last), (list->last) = (dropped_item), (((dropped_item)->next) = 0) ) :
-               ( ( (!((node->prev) == 0 || (node->prev) == 0) && (((node->prev)->next) == 0 || ((node->prev)->next) == 0)) ?
-                   (0) :
-                   ( (node->prev)->next->prev = (dropped_item) ) ), ((dropped_item)->next = (node->prev)->next), ((node->prev)->next = (dropped_item)), ((dropped_item)->prev = (node->prev)) ) );
-
-
-
-
-
-
-
-
-
-
-
-              (
-               ((list->first) == 0 || (list->first) == 0) ?
-               ( (list->first) = (list->last) = (dropped_item), (((dropped_item)->next) = 0), (((dropped_item)->prev) = 0) ) :
-               ((node->prev) == 0 || (node->prev) == 0) ?
-               ( (dropped_item)->next = (list->first), (list->first)->prev = (dropped_item), (list->first) = (dropped_item), (((dropped_item)->prev) = 0) ) :
-               ((node->prev)==(list->last)) ?
-               ( (list->last)->next = (dropped_item), (dropped_item)->prev = (list->last), (list->last) = (dropped_item), (((dropped_item)->next) = 0) ) :
-               ( ( (!((node->prev) == 0 || (node->prev) == 0) && (((node->prev)->next) == 0 || ((node->prev)->next) == 0)) ?
-                   (0) :
-                   ( (node->prev)->next->prev = (dropped_item) ) ), ((dropped_item)->next = (node->prev)->next), ((node->prev)->next = (dropped_item)), ((dropped_item)->prev = (node->prev)) ) );
-
-#endif
-              {
-                Item_node *nil = 0;
-                Item_node *f = list->first;
-                Item_node *l = list->last;
-                Item_node *p = node;
-                Item_node *n = dropped_item;
-
-                (check_nil(nil, f) ?
-                 ( (f) = (l) = (n), set_nil(nil,(n)->next), set_nil(nil,(n)->prev) ) :
-                 check_nil(nil,p) ? 
-                 ( (n)->next = (f), (f)->prev = (n), (f) = (n), set_nil(nil,(n)->prev) ) :
-                 ((p)==(l)) ? 
-                 ( (l)->next = (n), (n)->prev = (l), (l) = (n), set_nil(nil, (n)->next) ) :
-                 ( ( (!check_nil(nil,p) && check_nil(nil,(p)->next)) ?
-                     (0) :
-                     ( (p)->next->prev = (n) ) ), ((n)->next = (p)->next), ((p)->next = (n)), ((n)->prev = (p)) ) );
-
-              }
-#else 
-              /* NOTE(jfd 29/07/25)
+              /* NOTE(~jfd 29/07/25)
                *
                * Passing node->prev to dll_insert causes weird evaluation and doesn't insert properly
                * but if I literally paste the expansion of dll_insert in to the text it works.
@@ -556,7 +522,6 @@ func void game_update_and_draw(Game *gp) {
               Item_node *prev = node->prev;
 
               dll_insert(list->first, list->last, prev, dropped_item);
-#endif
             }
 
           }
@@ -571,16 +536,16 @@ func void game_update_and_draw(Game *gp) {
 #endif
 
 #if 1
-#if 1
+#if 0
     ui_child_layout_axis(1)
-      ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 300, }))
+      ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 360, }))
       ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250,  }))
       ui_border_color(RED) ui_border_size(2.0f)
       ui_flags(UI_BOX_FLAG_FLOATING | 0) ui_fixed_position(window_pos2)
       {
         UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
 
-        UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.7, };
+        UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.0, };
         //UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
         UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f};
         ui_parent(container2)

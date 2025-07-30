@@ -364,12 +364,11 @@ int build_raylib(void) {
   Str8 raylib_debug_build_dir = str8f(main_arena, "%S/debug", raylib_build_dir);
   Str8 raylib_web_build_dir = str8f(main_arena, "%S/web", raylib_build_dir);
 
-  // TODO os_mkdir()
-  ASSERT(nob_mkdir_if_not_exists((char*)raylib_build_dir.s));
-  ASSERT(nob_mkdir_if_not_exists((char*)raylib_static_build_dir.s));
-  ASSERT(nob_mkdir_if_not_exists((char*)raylib_shared_build_dir.s));
-  ASSERT(nob_mkdir_if_not_exists((char*)raylib_debug_build_dir.s));
-  ASSERT(nob_mkdir_if_not_exists((char*)raylib_web_build_dir.s));
+  ASSERT(os_make_dir((char*)raylib_build_dir.s));
+  ASSERT(os_make_dir((char*)raylib_static_build_dir.s));
+  ASSERT(os_make_dir((char*)raylib_shared_build_dir.s));
+  ASSERT(os_make_dir((char*)raylib_debug_build_dir.s));
+  ASSERT(os_make_dir((char*)raylib_web_build_dir.s));
 
   Str8 raylib_static_lib_path = str8f(main_arena, "%S/libraylib.a", raylib_static_build_dir);
   Str8 raylib_shared_lib_path = str8f(main_arena, "%S/%S", raylib_shared_build_dir, raylib_shared_lib_name);

@@ -89,6 +89,8 @@
 #define UI_BOX_FLAG_OVERFLOW (UI_BOX_FLAG_OVERFLOW_X | UI_BOX_FLAG_OVERFLOW_Y)
 #define UI_BOX_FLAG_FIXED_SIZE (UI_BOX_FLAG_FIXED_WIDTH | UI_BOX_FLAG_FIXED_HEIGHT)
 
+#define UI_BOX_FLAG_ALL (((UI_box_flags)(1ull<<UI_BOX_FLAG_INDEX_MAX))-1ull)
+
 
 #define UI_STYLE_PROPERTIES \
   /* lower               lower_alt             type              init                                               stack_size */ \
@@ -1045,7 +1047,7 @@ func void ui_get_frame_input(UI_context *ui) {
     event->input_flags |= UI_INPUT_FLAG_MOUSE_SCROLL;
   }
 
-  /* NOTE(jfd 29/07/25)
+  /* NOTE(~jfd 29/07/25)
    *
    * Temporarily using IsKeyDown() instead of saving the modifier_keys across frames
    * so that I can reset the whole ui->input_event struct each frame.
@@ -1410,7 +1412,7 @@ func void ui_end_build(UI_context *ui) {
           // TODO ryan puts animation here
 
           {
-            child->final_rect_min[axis] = node->final_rect_min[axis] + (&child->fixed_position.x)[axis] - floor_f32(node->view_offset[axis]);
+            child->final_rect_min[axis] =  node->final_rect_min[axis] + (&child->fixed_position.x)[axis] - floor_f32(node->view_offset[axis]);
           }
 
           child->final_rect_max[axis] = child->final_rect_min[axis] + child->fixed_size[axis];
@@ -1613,7 +1615,7 @@ func void ui_draw(UI_context *ui) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 0
+#if 1
     arena_scope(ui->temp) {
 
       Vector2 pos = { rec.x, rec.y };
