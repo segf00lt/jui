@@ -121,7 +121,7 @@
 #define UI_OTHER_PROPERTIES \
   /* lower               lower_alt                  type              init                       stack_size */ \
   X( parent,             parent,                    UI_box_ptr,       0,                         16          ) \
-  X( flags,              flags,                     UI_box_flags,     (UI_BOX_FLAG_OVERFLOW),    16          ) \
+  X( flags,              flags,                     UI_box_flags,     (0),                       16          ) \
   X( fixed_position,     fixed_position,            Vector2,          ((Vector2){0}),            4           ) \
   X( exclude_flags,      exclude_flags,             UI_box_flags,     0,                         16          ) \
 
@@ -718,6 +718,10 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
   box->min_size[0] = cur_min_width;
   box->min_size[1] = cur_min_height;
 
+  // TODO exclude flags aren't being applied properly
+  //
+  // it might be time to refactor the argument passing stacks to be more robust and ergonomic
+  // ui_prop_set_next() would be nice, with auto popping of the stacks
   box->flags |= flags;
   box->flags &= ~cur_exclude_flags;
 
@@ -1615,23 +1619,27 @@ func void ui_draw(UI_context *ui) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 1
+#if 0
     arena_scope(ui->temp) {
 
-      Vector2 pos = { rec.x, rec.y };
 
+#if 0
       SetTextLineSpacing(1);
-      DrawTextEx(GetFontDefault(),
-          (char*)str8f(ui->temp,
-            "x = %f\ty = %f\n\n"
-            "hash = %li\t\t\tsrc_str = %S\n"
-            ,
-            box->key.hash,
-            box->key.src_str,
-            box->fixed_position.x,
-            box->fixed_position.y
-            ).s,
-          pos, 10, 1.0, GREEN);
+      {
+        Vector2 pos = { rec.x, rec.y };
+        DrawTextEx(GetFontDefault(),
+            (char*)str8f(ui->temp,
+              "x = %f\ty = %f\n\n"
+              "hash = %li\t\t\tsrc_str = %S\n"
+              ,
+              box->key.hash,
+              box->key.src_str,
+              box->fixed_position.x,
+              box->fixed_position.y
+              ).s,
+            pos, 10, 1.0, GREEN);
+      }
+#endif
 
       SetTextLineSpacing(5);
       DrawRectangleLinesEx(rec, 1.0, RED);
