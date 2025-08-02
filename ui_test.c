@@ -119,6 +119,8 @@ UI_signal ui_button(UI_context *ui, Str8 label);
 UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height);
 void ui_spacer(UI_context *ui, f32 size);
 
+UI_signal ui_button_2(UI_context *ui, Str8 label);
+
 /*
  * entity settings
  */
@@ -270,7 +272,77 @@ func UI_signal item_button(Game *gp, Item_node *item) {
     ui_font_size(20.0f)
     ui_font_spacing(2.0f)
 
-    sig = ui_button(gp->ui, item->text);
+    sig = ui_button_2(gp->ui, item->text);
+
+  return sig;
+}
+
+func UI_signal ui_button_2(UI_context *ui, Str8 label) {
+
+  UI_box *button_box = 0;
+
+  //UI_box_flags container_flags =
+  //  0;
+
+  UI_size sum = { .kind = UI_SIZE_CHILDREN_SUM, .value = 0.0f, .strictness = 1.0f };
+
+  //ui_flags_set_next(container_flags);
+  ui_exclude_flags_set_next(UI_BOX_FLAG_FIXED_SIZE | UI_BOX_FLAG_DRAW);
+  ui_child_layout_axis_set_next(UI_AXIS_Y);
+  ui_semantic_size_set_next(sum);
+  UI_box *outer_container = ui_make_transient_box(ui);
+
+  ui_parent(outer_container) ui_exclude_flags(UI_BOX_FLAG_FLOATING)
+  {
+
+    UI_size space = { .kind = UI_SIZE_PIXELS, .value = 1.0f*ui_prop_top(border_size), .strictness = 1.0f, };
+
+    ui_exclude_flags(UI_BOX_FLAG_DRAW) ui_semantic_size(space) ui_make_transient_box(ui);
+
+    //ui_flags_set_next(container_flags);
+    ui_child_layout_axis_set_next(UI_AXIS_X);
+    ui_semantic_size_set_next(sum);
+    // TODO this api is a little weird for dealing with flags
+    //
+    // sometimes we want a totaly fresh set of flags. sometimes we want to just enable new ones
+    //
+    // I don't know if always having a push flags call just togle new flags on is a good idea
+    ui_exclude_flags_set_next(UI_BOX_FLAG_DRAW | UI_BOX_FLAG_FLOATING | UI_BOX_FLAG_FIXED_SIZE);
+
+    UI_box *inner_container = ui_make_transient_box(ui);
+
+    ui_parent(inner_container)
+    {
+
+      ui_exclude_flags(UI_BOX_FLAG_DRAW) ui_semantic_size(space) ui_make_transient_box(ui);
+
+      UI_box_flags flags =
+        UI_BOX_FLAG_DRAW_BACKGROUND |
+        UI_BOX_FLAG_DRAW_TEXT |
+        UI_BOX_FLAG_DRAW_BORDER |
+        UI_BOX_FLAG_MOUSE_CLICKABLE |
+        0;
+
+      button_box = ui_make_box_from_str(ui, flags, label);
+
+      ui_exclude_flags(UI_BOX_FLAG_DRAW) ui_semantic_size(space) ui_make_transient_box(ui);
+    }
+
+    ui_exclude_flags(UI_BOX_FLAG_DRAW) ui_semantic_size(space) ui_make_transient_box(ui);
+
+  }
+
+  UI_signal sig = ui_signal_from_box(ui, button_box);
+
+  Color background_color = button_box->background_color;
+
+  if(ui_key_match(ui_hot_box_key(ui), button_box->key)) {
+    button_box->background_color = ColorBrightness(background_color, 0.12f);
+  }
+
+  if(ui_key_match(ui_active_box_key(ui, UI_MOUSE_BUTTON_LEFT), button_box->key)) {
+    button_box->background_color = ColorBrightness(background_color, -0.17f);
+  }
 
   return sig;
 }
@@ -292,7 +364,7 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
   UI_size main_width = { .kind = UI_SIZE_PIXELS, .value = width, .strictness = 1.0f };
   UI_size main_height = { .kind = UI_SIZE_PIXELS, .value = height, .strictness = 1.0f };
   UI_size fit = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.0f, };
-  //UI_size sum = { .kind = UI_SIZE_CHILDREN_SUM, .value = 0.0f, .strictness = 0.0f, };
+  UI_size sum = { .kind = UI_SIZE_CHILDREN_SUM, .value = 0.0f, .strictness = 0.0f, };
 
   ui_flags(flags)
     ui_exclude_flags(UI_BOX_FLAG_OVERFLOW)
@@ -310,12 +382,13 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
     ui_semantic_size(fit)
       box = ui_make_box_from_key(gp->ui, 0, ui_key_nil());
 
-    ui_child_layout_axis(UI_AXIS_X) ui_semantic_size(fit)
+    ui_child_layout_axis(UI_AXIS_X)
       ui_parent(box)
       {
         ui_spacer(ui, padding);
 
         ui_child_layout_axis(UI_AXIS_Y)
+          ui_semantic_height(sum)
           ui_semantic_width(fit)
           inner_container_box =
           ui_make_box_from_str(gp->ui,
@@ -403,12 +476,22 @@ func void game_update_and_draw(Game *gp) {
       }
 #endif
 
-#if 1
     Color background_color = { 83, 82, 99, 255 };
     Color border_color = { 53, 52, 69, 255 };
     Color text_color = ColorBrightness(RAYWHITE, 0.7f);
 
     Color window_background_color = ColorBrightness(BLUE, -0.4f);
+
+    //ui_background_color(background_color) ui_text_color(text_color) ui_border_color(border_color)
+    //  ui_padding(6.0f)
+    //  ui_border_size(4.0f) ui_corner_radius(0.5f)
+    //  ui_flags(UI_BOX_FLAG_FLOATING)
+    //  ui_fixed_position(((Vector2){ 200, 200 }))
+    //  ui_font_size(30.0f) ui_font_spacing(3.0f)
+    //  ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 1.0f, .strictness = 1.0f }))
+    //  ui_button_2(ui, str8_lit("test button"));
+
+#if 1
 
     if(gp->dragging_item) {
       ui_permission_flags_top() |=
@@ -453,7 +536,7 @@ func void game_update_and_draw(Game *gp) {
               item_sig = item_button(gp, item);
 
             if(next) {
-              ui_spacer(ui, 5);
+              ui_spacer(ui, 1);
             }
 
             UI_box *item_box = item_sig.box;
@@ -481,7 +564,6 @@ func void game_update_and_draw(Game *gp) {
 
 
     ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(window_pos1)
-      ui_exclude_flags(UI_BOX_FLAG_FLOATING)
       ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
       ui_child_layout_axis(UI_AXIS_Y)
       {
@@ -489,6 +571,7 @@ func void game_update_and_draw(Game *gp) {
 
         ui_parent(container1)
           ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
+          ui_exclude_flags(UI_BOX_FLAG_FLOATING)
           ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
           ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 }))
           ui_text_align((UI_text_align){ UI_TEXT_ALIGN_CENTER })
@@ -515,7 +598,7 @@ func void game_update_and_draw(Game *gp) {
       ui_flags(UI_BOX_FLAG_FLOATING)
         //ui_exclude_flags(UI_BOX_FLAG_FLOATING)
         ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
-        //ui_background_color(background_color)
+        ui_background_color(background_color)
         ui_border_color(border_color) ui_text_color(text_color)
         ui_fixed_width(gp->draggin_item_size[0]) ui_fixed_height(gp->draggin_item_size[1])
         ui_border_size(2.0f)
@@ -591,7 +674,7 @@ func void game_update_and_draw(Game *gp) {
             ui_semantic_height(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f }))
               ui_background_color(BLUE) ui_text_color(GOLD) ui_text_align(UI_TEXT_ALIGN_LEFT)
               {
-                UI_signal sig = ui_button(ui, str8_lit("Drag Me!##drag_bar"));
+                UI_signal sig = ui_button_2(ui, str8_lit("Drag Me!##drag_bar"));
 
                 if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
                   save_window_pos2 = window_pos2;
@@ -604,7 +687,7 @@ func void game_update_and_draw(Game *gp) {
               }
             ui_spacer(ui, spacing);
 
-            ui_button(ui, str8_lit("hello world##1_0"));
+            ui_button_2(ui, str8_lit("hello world##1_0"));
             ui_spacer(ui, spacing);
             ui_button(ui, str8_lit("my##1_1"));
             ui_spacer(ui, spacing);

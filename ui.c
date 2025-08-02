@@ -88,6 +88,7 @@
 #define UI_BOX_FLAG_FLOATING (UI_BOX_FLAG_FLOATING_X | UI_BOX_FLAG_FLOATING_Y)
 #define UI_BOX_FLAG_OVERFLOW (UI_BOX_FLAG_OVERFLOW_X | UI_BOX_FLAG_OVERFLOW_Y)
 #define UI_BOX_FLAG_FIXED_SIZE (UI_BOX_FLAG_FIXED_WIDTH | UI_BOX_FLAG_FIXED_HEIGHT)
+#define UI_BOX_FLAG_DRAW (UI_BOX_FLAG_DRAW_BACKGROUND | UI_BOX_FLAG_DRAW_TEXT | UI_BOX_FLAG_DRAW_BORDER)
 
 #define UI_BOX_FLAG_ALL (((UI_box_flags)(1ull<<UI_BOX_FLAG_INDEX_MAX))-1ull)
 
@@ -106,8 +107,8 @@
   X( font_size,          font_size,            f32,              ((f32)10.0f),                                      8           ) \
   X( font_spacing,       font_spacing,         f32,              ((f32)1.0f),                                       4           ) \
   X( text_align,         text_align,           UI_text_align,    UI_TEXT_ALIGN_LEFT,                                16          ) \
-  X( semantic_width,     semantic_size[0],     UI_size,          ((UI_size){ .kind = UI_SIZE_CHILDREN_SUM }),       16          ) \
-  X( semantic_height,    semantic_size[1],     UI_size,          ((UI_size){ .kind = UI_SIZE_CHILDREN_SUM }),       16          ) \
+  X( semantic_width,     semantic_size[0],     UI_size,          ((UI_size){ .kind = UI_SIZE_NONE }),               16          ) \
+  X( semantic_height,    semantic_size[1],     UI_size,          ((UI_size){ .kind = UI_SIZE_NONE }),               16          ) \
   X( padding,            padding,              f32,              ((f32)2.0f),                                       8           ) \
   X( child_layout_axis,  child_layout_axis,    UI_axis,          ((UI_axis)0),                                      64          ) \
 
@@ -174,6 +175,46 @@
 
 #define ui_permission_flags(value) ui_prop(permission_flags, (value))
 #define ui_permission_flags_top() ui_prop_top(permission_flags)
+
+#define ui_background_color(value) ui_prop(background_color, (value))
+
+#define ui_text_color(value) ui_prop(text_color, (value))
+
+#define ui_border_color_set_next(value) ui_prop_set_next(border_color, (value))
+#define ui_border_size_set_next(value) ui_prop_set_next(border_size, (value))
+
+#define ui_corner_radius_0_set_next(value) ui_prop_set_next(corner_radius_0, (value))
+#define ui_corner_radius_1_set_next(value) ui_prop_set_next(corner_radius_1, (value))
+#define ui_corner_radius_2_set_next(value) ui_prop_set_next(corner_radius_2, (value))
+#define ui_corner_radius_3_set_next(value) ui_prop_set_next(corner_radius_3, (value))
+#define ui_corner_radius_set_next(value) (ui_corner_radius_0_set_next((value)), ui_corner_radius_1_set_next((value))m ui_corner_radius_2_set_next((value)), ui_corner_radius_3_set_next((value)))
+
+#define ui_font_id_set_next(value) ui_prop_set_next(font_id, (value))
+#define ui_font_size_set_next(value) ui_prop_set_next(font_size, (value))
+#define ui_font_spacing_set_next(value) ui_prop_set_next(font_spacing, (value))
+
+#define ui_text_align_set_next(value) ui_prop_set_next(text_align, (value))
+
+#define ui_semantic_width_set_next(value) ui_prop_set_next(semantic_width, (value))
+#define ui_semantic_height_set_next(value) ui_prop_set_next(semantic_height, (value))
+#define ui_semantic_size_set_next(value) (ui_semantic_width_set_next((value)), ui_semantic_height_set_next((value)))
+
+#define ui_fixed_width_set_next(value) ui_prop_set_next(fixed_width, (value))
+#define ui_fixed_height_set_next(value) ui_prop_set_next(fixed_height, (value))
+#define ui_fixed_size_set_next(value) (ui_fixed_width_set_next((value)), ui_fixed_height_set_next((value)))
+
+#define ui_padding_set_next(value) ui_prop_set_next(padding, (value))
+
+#define ui_fixed_position_set_next(value) ui_prop_set_next(fixed_position, (value))
+
+#define ui_child_layout_axis_set_next(value) ui_prop_set_next(child_layout_axis, (value))
+
+#define ui_parent_set_next(value) ui_prop_set_next(parent, (value))
+
+#define ui_flags_set_next(value) ui_prop_set_next(flags, (value))
+#define ui_exclude_flags_set_next(value) ui_prop_set_next(exclude_flags, (value))
+
+#define ui_permission_flags_set_next(value) ui_prop_set_next(permission_flags, (value))
 
 #define DECL_UI_ARR(T) DECL_ARR_TYPE_NAME(T, UI_ARR_PREFIX##T)
 
@@ -467,6 +508,11 @@ struct UI_context {
   UI_NON_BOX_PROPERTIES;
 #undef X
 
+#define X(lower, lower_alt, type, init, stack_size) b32 lower##_auto_pop;
+  UI_PROPERTIES
+  UI_NON_BOX_PROPERTIES;
+#undef X
+
 };
 
 /*
@@ -513,10 +559,11 @@ UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn);
  */
 
 #define ui_build(ui) defer_loop(ui_begin_build((ui)), ui_end_build((ui)))
-#define ui_push_prop(name, value) (arr_push(ui->name##_stack, (value)))
-#define ui_pop_prop(name) (arr_pop(ui->name##_stack))
+#define ui_prop_push(name, value) (arr_push(ui->name##_stack, (value)))
+#define ui_prop_pop(name) (arr_pop(ui->name##_stack))
+#define ui_prop_set_next(name, value) (arr_push(ui->name##_stack, (value)), (ui->name##_auto_pop = 1))
 #define ui_clear_prop(name) (arr_clear(ui->name##_stack))
-#define ui_prop(name, value) defer_loop(ui_push_prop(name, (value)), ui_pop_prop(name))
+#define ui_prop(name, value) defer_loop(ui_prop_push(name, (value)), ui_prop_pop(name))
 #define ui_prop_top(name) (arr_last(ui->name##_stack))
 
 #define ui_mouse_button_mask(button) ((UI_mouse_button_mask)(1<<(button)))
@@ -564,7 +611,7 @@ func UI_context* ui_init(void) {
 
 //#define X(lower, lower_alt, type, init, stack_size) \
 //  type _tmp_init_##lower = init; \
-//  ui_push_prop(lower, _tmp_init_##lower);
+//  ui_prop_push(lower, _tmp_init_##lower);
 //  UI_STYLE_PROPERTIES;
 //  UI_OTHER_PROPERTIES;
 //#undef X
@@ -717,6 +764,15 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
 
   box->min_size[0] = cur_min_width;
   box->min_size[1] = cur_min_height;
+
+#define X(lower, lower_alt, type, init, stack_size) \
+  if(ui->lower##_auto_pop) { \
+    ui->lower##_auto_pop = 0; \
+    ui_prop_pop(lower); \
+  }
+  UI_STYLE_PROPERTIES;
+  UI_OTHER_PROPERTIES;
+#undef X
 
   // TODO exclude flags aren't being applied properly
   //
@@ -1096,7 +1152,7 @@ func void ui_begin_build(UI_context *ui) {
   ui->root = dummy;
 
 #define X(lower, lower_alt, type, init, stack_size) \
-  ui_push_prop(lower, init);
+  ui_prop_push(lower, init);
   UI_STYLE_PROPERTIES;
   UI_OTHER_PROPERTIES;
   UI_NON_BOX_PROPERTIES;
@@ -1109,7 +1165,7 @@ func void ui_begin_build(UI_context *ui) {
   UI_OTHER_PROPERTIES;
 #undef X
 
-  ui_push_prop(parent, ui->root);
+  ui_prop_push(parent, ui->root);
 
   ui_get_frame_input(ui);
   ui->mouse_pos = ui->input_event.mouse_pos;
@@ -1137,40 +1193,44 @@ func void ui_begin_build(UI_context *ui) {
 func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
   f32 sum = 0;
 
-  if(box->first) {
+  if(!box) goto end;
 
-    sum = ui_calc_downward_dependent_sizes(box->first, axis, box->child_layout_axis);
+  for(; box; box = box->next) {
+
+    f32 child_sum = 0.0f;
+
+    if(box->first) {
+      child_sum = ui_calc_downward_dependent_sizes(box->first, axis, box->child_layout_axis);
+    }
 
     if(box->semantic_size[axis].kind == UI_SIZE_CHILDREN_SUM) {
-      box->fixed_size[axis] = sum;
+      ASSERT(box->first);
+
+      box->fixed_size[axis] = child_sum;
+
+      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
+        if(axis == layout_axis) {
+          sum += child_sum;
+        } else {
+          sum = MAX(child_sum, sum);
+        }
+      }
+
     } else {
-      sum += box->fixed_size[axis];
+
+      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
+        if(axis == layout_axis) {
+          sum += box->fixed_size[axis];
+        } else {
+          sum = MAX(box->fixed_size[axis], sum);
+        }
+      }
+
     }
 
   }
 
-  {
-
-    if(axis == layout_axis) {
-      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
-        sum += box->fixed_size[axis];
-      }
-
-      if(box->next) {
-        sum += ui_calc_downward_dependent_sizes(box->next, axis, layout_axis);
-      }
-    } else {
-      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
-        sum = MAX(box->fixed_size[axis], sum);
-      }
-
-      if(box->next) {
-        sum = MAX(ui_calc_downward_dependent_sizes(box->next, axis, layout_axis), sum);
-      }
-    }
-
-  }
-
+end:;
   return sum;
 }
 
@@ -1623,7 +1683,7 @@ func void ui_draw(UI_context *ui) {
     arena_scope(ui->temp) {
 
 
-#if 0
+#if 1
       SetTextLineSpacing(1);
       {
         Vector2 pos = { rec.x, rec.y };
