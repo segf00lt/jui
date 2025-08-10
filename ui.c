@@ -538,7 +538,7 @@ Vector2 ui_drag_delta(UI_context *ui);
 UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key);
 UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flags flags, Str8 str);
 UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flags flags, char *fmt, ...);
-UI_box* ui_make_transient_box(UI_context *ui);
+UI_box* ui_make_transient_box(UI_context *ui, UI_box_flags flags);
 
 UI_box_node* ui_push_box_node(UI_context *ui);
 
@@ -697,8 +697,8 @@ func UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn) {
   return ui->active_box_key[btn];
 }
 
-func UI_box* ui_make_transient_box(UI_context *ui) {
-  return ui_make_box_from_key(ui, 0, ((UI_key){0}));
+func UI_box* ui_make_transient_box(UI_context *ui, UI_box_flags flags) {
+  return ui_make_box_from_key(ui, flags, ((UI_key){0}));
 }
 
 func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key) {
@@ -774,10 +774,6 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
   UI_OTHER_PROPERTIES;
 #undef X
 
-  // TODO exclude flags aren't being applied properly
-  //
-  // it might be time to refactor the argument passing stacks to be more robust and ergonomic
-  // ui_prop_set_next() would be nice, with auto popping of the stacks
   box->flags |= flags;
   box->flags &= ~cur_exclude_flags;
 
@@ -905,7 +901,7 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       ui->active_box_key[btn] = ui_key_nil();
     }
 
-#if !1
+#if 0
     /* dragging */
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
         ((sig.flags & (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn)) ||
@@ -1236,7 +1232,6 @@ end:;
 
 func void ui_end_build(UI_context *ui) {
 
-  // TODO why not just clear all the stacks??
 #define X(lower, lower_alt, type, init, stack_size) ui_clear_prop(lower);
   UI_PROPERTIES;
   UI_NON_BOX_PROPERTIES;
@@ -1265,6 +1260,8 @@ func void ui_end_build(UI_context *ui) {
       { /* visit nodes with UI_SIZE_PIXELS or UI_SIZE_TEXT_CONTENT */
 
         for(UI_box *node = ui->root; node;) {
+
+          ASSERT(node);
 
           UI_size size = node->semantic_size[axis];
 
