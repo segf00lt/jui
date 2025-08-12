@@ -180,6 +180,10 @@
 
 #define ui_text_color(value) ui_prop(text_color, (value))
 
+#define ui_background_color_set_next(value) ui_prop_set_next(background_color, (value))
+
+#define ui_text_color_set_next(value) ui_prop_set_next(text_color, (value))
+
 #define ui_border_color_set_next(value) ui_prop_set_next(border_color, (value))
 #define ui_border_size_set_next(value) ui_prop_set_next(border_size, (value))
 
@@ -187,8 +191,7 @@
 #define ui_corner_radius_1_set_next(value) ui_prop_set_next(corner_radius_1, (value))
 #define ui_corner_radius_2_set_next(value) ui_prop_set_next(corner_radius_2, (value))
 #define ui_corner_radius_3_set_next(value) ui_prop_set_next(corner_radius_3, (value))
-#define ui_corner_radius_set_next(value) (ui_corner_radius_0_set_next((value)), ui_corner_radius_1_set_next((value))m ui_corner_radius_2_set_next((value)), ui_corner_radius_3_set_next((value)))
-
+#define ui_corner_radius_set_next(value) (ui_corner_radius_0_set_next((value)), ui_corner_radius_1_set_next((value)), ui_corner_radius_2_set_next((value)), ui_corner_radius_3_set_next((value)))
 #define ui_font_id_set_next(value) ui_prop_set_next(font_id, (value))
 #define ui_font_size_set_next(value) ui_prop_set_next(font_size, (value))
 #define ui_font_spacing_set_next(value) ui_prop_set_next(font_spacing, (value))
@@ -402,6 +405,7 @@ struct UI_box {
   UI_box_flags exclude_flags;
 
   UI_key key;
+  u64 debug_id;
 
   UI_box *hash_next;
   UI_box *hash_prev;
@@ -477,6 +481,8 @@ struct UI_context {
   Arena *draw_arena;
 
   u64 build_index;
+
+  u64 debug_id_counter;
 
   UI_box __dummy;
   UI_box *dummy;
@@ -567,6 +573,12 @@ UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn);
 #define ui_prop_top(name) (arr_last(ui->name##_stack))
 
 #define ui_mouse_button_mask(button) ((UI_mouse_button_mask)(1<<(button)))
+
+
+#define ui_pixels(val, strict) ((UI_size){ .kind = UI_SIZE_PIXELS, .value = (f32)(val), .strictness = (f32)(strict) })
+#define ui_text_content(strict) ((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 0.0f, .strictness = (f32)(strict) })
+#define ui_percent_of_parent(val, strict) ((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = (f32)(val), .strictness = (f32)(strict) })
+#define ui_children_sum(strict) ((UI_size){ .kind = UI_SIZE_CHILDREN_SUM, .value = 0.0f, .strictness = (f32)(strict) })
 
 /*
  * globals
@@ -723,6 +735,8 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
       box = push_struct_no_zero(box_is_transient ? ui->build_arena : ui->arena, UI_box);
     }
     memory_zero(box, sizeof(UI_box));
+
+    box->debug_id = ui->debug_id_counter++;
   }
 
   {
@@ -1186,6 +1200,7 @@ func void ui_begin_build(UI_context *ui) {
 }
 
 // TODO make an iterative version of this
+// TODO correct ui_calc_downward_dependent_sizes()
 func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis) {
   f32 sum = 0;
 
@@ -1194,6 +1209,45 @@ func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis
   for(; box; box = box->next) {
 
     f32 child_sum = 0.0f;
+
+#if 0
+    if(box->first) {
+      child_sum = ui_calc_downward_dependent_sizes(box->first, axis, box->child_layout_axis);
+
+      if(box->semantic_size[axis].kind == UI_SIZE_CHILDREN_SUM) {
+        box->fixed_size[axis] = child_sum;
+
+        if(axis == layout_axis) {
+          sum += child_sum;
+        } else {
+          sum = MAX(child_sum, sum);
+        }
+
+      } else {
+
+        if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
+          if(axis == layout_axis) {
+            sum += box->fixed_size[axis];
+          } else {
+            sum = MAX(box->fixed_size[axis], sum);
+          }
+        }
+
+      }
+
+    } else {
+
+      if(!(box->flags & (UI_BOX_FLAG_FLOATING_X<<axis))) {
+        if(axis == layout_axis) {
+          sum += box->fixed_size[axis];
+        } else {
+          sum = MAX(box->fixed_size[axis], sum);
+        }
+      }
+
+    }
+
+#else
 
     if(box->first) {
       child_sum = ui_calc_downward_dependent_sizes(box->first, axis, box->child_layout_axis);
@@ -1223,6 +1277,7 @@ func f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis
       }
 
     }
+#endif
 
   }
 
@@ -1231,6 +1286,8 @@ end:;
 }
 
 func void ui_end_build(UI_context *ui) {
+
+  ui->debug_id_counter = 0;
 
 #define X(lower, lower_alt, type, init, stack_size) ui_clear_prop(lower);
   UI_PROPERTIES;
@@ -1439,6 +1496,7 @@ func void ui_end_build(UI_context *ui) {
             }
             if(node) node = node->next;
           }
+
         }
 
       } /* solve size violations in a pre order traversal */
@@ -1594,7 +1652,15 @@ func void dump_UI_box(const UI_box *box) {
     printf("}\n");
 }
 
+//int dumped = 2;
+
 func void ui_draw(UI_context *ui) {
+  
+  //if(dumped > 0) {
+  //  printf("====== BEGIN DRAW DUMP ======\n");
+  //}
+  //
+  //int depth = 0;
 
   for(UI_box *box = ui->root; box;) {
 
@@ -1680,21 +1746,37 @@ func void ui_draw(UI_context *ui) {
     arena_scope(ui->temp) {
 
 
-#if 1
+#if 0
       SetTextLineSpacing(1);
       {
-        Vector2 pos = { rec.x, rec.y };
-        DrawTextEx(GetFontDefault(),
-            (char*)str8f(ui->temp,
-              "x = %f\ty = %f\n\n"
-              "hash = %li\t\t\tsrc_str = %S\n"
+        Str8 dump = 
+            str8f(ui->temp,
+              "%*sx = %f\ty = %f\n\n"
+              "%*swidth = %f\theight = %f\n\n"
+              "%*shash = %li\t\t\tsrc_str = %S\n"
+              "%*sdebug id = %lu%"
               ,
+              depth, "\t",
+              box->final_rect_min[0],
+              box->final_rect_min[1],
+              depth, "\t",
+              box->final_rect_max[0] - box->final_rect_min[0],
+              box->final_rect_max[1] - box->final_rect_min[1],
+              depth, "\t",
               box->key.hash,
               box->key.src_str,
-              box->fixed_position.x,
-              box->fixed_position.y
-              ).s,
-            pos, 10, 1.0, GREEN);
+              depth, "\t",
+              box->debug_id
+              );
+
+        if(dumped > 0) {
+          printf("%s\n\n", (char*)dump.s);
+        }
+
+        //Vector2 pos = { rec.x, rec.y };
+        //DrawTextEx(GetFontDefault(),
+        //    (char*)dump.s,
+        //    pos, 10, 1.0, GREEN);
       }
 #endif
 
@@ -1704,6 +1786,7 @@ func void ui_draw(UI_context *ui) {
 #endif
 
     if(box->first) {
+      //depth++;
       box = box->first;
     } else {
 
@@ -1715,6 +1798,7 @@ func void ui_draw(UI_context *ui) {
         box = box->next;
       } else {
         while(box && !(box->next)) {
+          //depth--;
           box = box->parent;
 
           if(box && box->flags & UI_BOX_FLAG_CLIP) {
@@ -1732,6 +1816,11 @@ func void ui_draw(UI_context *ui) {
   } /* for(UI_box_node *node = ui->root; node;) */
 
   arena_clear(ui->draw_arena);
+
+  //if(dumped > 0) {
+  //  printf("====== END DRAW DUMP ======\n");
+  //  dumped--;
+  //}
 
 }
 
