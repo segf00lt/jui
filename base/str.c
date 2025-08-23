@@ -311,6 +311,26 @@ func Str8 str8_to_upper(Arena *a, Str8 str) {
   return upper_str;
 }
 
+func Str8 str8_chop_last_slash(Str8 str) {
+  if(str.len > 0) {
+    u8 *ptr = str.s + str.len - 1;
+    for(;ptr >= str.s; ptr -= 1) {
+      if(*ptr == '/' || *ptr == '\\')
+      {
+        break;
+      }
+    }
+    if(ptr >= str.s) {
+      str.len = (u64)(ptr - str.s);
+    }
+    else
+    {
+      str.len = 0;
+    }
+  }
+  return str;
+}
+
 func Str8_list str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars) {
   Str8_list result = {0};
   Str8_node head = {0};

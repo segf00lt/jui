@@ -60,6 +60,12 @@ func Date_time date_time_from_micro_seconds(u64 time) {
   return result;
 }
 
+func Dense_time dense_time_from_unix_time(u64 unix_time) {
+  // TODO make this more direct if possible
+  Dense_time result = dense_time_from_date_time(date_time_from_unix_time(unix_time));
+  return result;
+}
+
 func Date_time date_time_from_unix_time(u64 unix_time) {
   Date_time date = {0};
   date.year     = 1970;

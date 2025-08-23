@@ -58,6 +58,8 @@ Str8_list str8_split_by_string(Arena *a, Str8 str, Str8 sep);
 Str8_list str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars);
 Str8_list str8_split_by_char(Arena *a, Str8 str, u8 sep_char);
 
+Str8 str8_chop_last_slash(Str8 str);
+
 #define str8_list_append_node(list, node) str8_list_append_node_(&(list), node)
 void str8_list_append_node_(Str8_list *list, Str8_node *node);
 

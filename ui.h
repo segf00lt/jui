@@ -232,7 +232,7 @@
  * typedefs
  */
 
-typedef struct UI_context UI_context;
+typedef struct UI_state UI_state;
 typedef struct UI_box UI_box;
 typedef struct UI_box_node UI_box_node;
 typedef struct UI_box_list UI_box_list;
@@ -304,18 +304,18 @@ STATIC_ASSERT(UI_BOX_FLAG_INDEX_MAX < 64, UI_BOX_FLAG_INDEX_MAX__is_less_than_64
 UI_BOX_FLAGS
 #undef X
 
-typedef enum UI_context_flags_index {
+typedef enum UI_state_flags_index {
   UI_CONTEXT_FLAG_INDEX_NONE = -1,
 #define X(f) UI_CONTEXT_FLAG_INDEX_##f,
   UI_CONTEXT_FLAGS
 #undef X
     UI_CONTEXT_FLAG_INDEX_MAX,
-} UI_context_flags_index;
+} UI_state_flags_index;
 
-typedef u64 UI_context_flags;
+typedef u64 UI_state_flags;
 STATIC_ASSERT(UI_CONTEXT_FLAG_INDEX_MAX < 64, UI_CONTEXT_FLAG_INDEX_MAX__is_less_than_64);
 
-#define X(f) const UI_context_flags UI_CONTEXT_FLAG_##f = (1ull<<UI_CONTEXT_FLAG_INDEX_##f);
+#define X(f) const UI_state_flags UI_CONTEXT_FLAG_##f = (1ull<<UI_CONTEXT_FLAG_INDEX_##f);
 UI_CONTEXT_FLAGS
 #undef X
 
@@ -481,7 +481,7 @@ struct UI_box_hash_slot {
   UI_box *last;
 };
 
-struct UI_context {
+struct UI_state {
   Arena *arena;
   Arena *temp;
   Arena *build_arena;
@@ -500,7 +500,7 @@ struct UI_context {
 
   Font fonts[8];
 
-  UI_context_flags flags;
+  UI_state_flags flags;
 
   UI_event input_event;
 
@@ -532,52 +532,54 @@ struct UI_context {
  * function headers
  */
 
-UI_context* ui_init(void);
-void        ui_close(UI_context *ui);
+UI_state* ui_state_alloc(void);
+void      ui_state_select(UI_state *state);
+UI_state* ui_state_get_selected(void);
+void      ui_state_free(UI_state *ui);
 
 UI_key ui_key_nil(void);
 UI_key ui_key_from_str(Str8 str);
 b32 ui_key_match(UI_key a, UI_key b);
 
-UI_box* ui_get_box_from_key(UI_context *ui, UI_key key);
-UI_box* ui_get_box_from_str(UI_context *ui, Str8 s);
+UI_box* ui_get_box_from_key(UI_key key);
+UI_box* ui_get_box_from_str(Str8 s);
 
-UI_signal ui_signal_from_box(UI_context *ui, UI_box *box);
+UI_signal ui_signal_from_box(UI_box *box);
 
 Str8 ui_strip_id_from_text(Str8 text);
 
-Vector2 ui_drag_delta(UI_context *ui);
+Vector2 ui_drag_delta(UI_state *ui);
 
-UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key);
-UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flags flags, Str8 str);
-UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flags flags, char *fmt, ...);
-UI_box* ui_make_transient_box(UI_context *ui, UI_box_flags flags);
+UI_box* ui_make_box_from_key(UI_box_flags flags, UI_key key);
+UI_box* ui_make_box_from_str(UI_box_flags flags, Str8 str);
+UI_box* ui_make_box_from_strf(UI_box_flags flags, char *fmt, ...);
+UI_box* ui_make_transient_box(UI_box_flags flags);
 
-UI_box_node* ui_push_box_node(UI_context *ui);
+UI_box_node* ui_push_box_node(void);
 
 f32 ui_calc_downward_dependent_sizes(UI_box *box, int axis, int layout_axis);
 
-void ui_begin_build(UI_context *ui);
-void ui_end_build(UI_context *ui);
-void ui_draw(UI_context *ui);
-UI_event ui_get_event(UI_context *ui);
-void ui_get_frame_input(UI_context *ui);
+void ui_begin_build(void);
+void ui_end_build(void);
+void ui_draw(void);
+UI_event ui_get_event(void);
+void ui_get_frame_input(void);
 
-UI_key ui_hot_box_key(UI_context *ui);
-UI_key ui_drop_hot_box_key(UI_context *ui);
-UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn);
+UI_key ui_hot_box_key(void);
+UI_key ui_drop_hot_box_key(void);
+UI_key ui_active_box_key(UI_mouse_button btn);
 
 /*
  * macros
  */
 
-#define ui_build(ui) defer_loop(ui_begin_build((ui)), ui_end_build((ui)))
-#define ui_prop_push(name, value) (arr_push(ui->name##_stack, (value)))
-#define ui_prop_pop(name) (arr_pop(ui->name##_stack))
-#define ui_prop_set_next(name, value) (arr_push(ui->name##_stack, (value)), (ui->name##_auto_pop = 1))
-#define ui_clear_prop(name) (arr_clear(ui->name##_stack))
+#define ui_build() defer_loop(ui_begin_build(), ui_end_build())
+#define ui_prop_push(name, value) (arr_push(ui_state->name##_stack, (value)))
+#define ui_prop_pop(name) (arr_pop(ui_state->name##_stack))
+#define ui_prop_set_next(name, value) (arr_push(ui_state->name##_stack, (value)), (ui_state->name##_auto_pop = 1))
+#define ui_clear_prop(name) (arr_clear(ui_state->name##_stack))
 #define ui_prop(name, value) defer_loop(ui_prop_push(name, (value)), ui_prop_pop(name))
-#define ui_prop_top(name) (arr_last(ui->name##_stack))
+#define ui_prop_top(name) (arr_last(ui_state->name##_stack))
 
 #define ui_mouse_button_mask(button) ((UI_mouse_button_mask)(1<<(button)))
 

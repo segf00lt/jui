@@ -5,6 +5,8 @@
  * globals
  */
 
+thread_static UI_state *ui_state = 0;
+
 //s64 max_dumps = 7;
 
 /*
@@ -25,13 +27,12 @@ f32 ui_prof_time_to_calc_positions;
  * function bodies
  */
 
-func UI_context* ui_init(void) {
+func UI_state* ui_state_alloc(void) {
   
-  UI_context *ui = os_alloc(sizeof(UI_context));
+  Arena *arena = arena_alloc(MB(1));
+  UI_state *ui = push_struct(arena, UI_state);
 
-  memory_zero(ui, sizeof(UI_context));
-
-  ui->arena       = arena_alloc(MB(1));
+  ui->arena       = arena;
   ui->temp        = arena_alloc(KB(8));
   ui->build_arena = arena_alloc(KB(16));
   ui->draw_arena  = arena_alloc(KB(16));
@@ -57,12 +58,19 @@ func UI_context* ui_init(void) {
   return ui;
 }
 
-func void ui_close(UI_context *ui) {
-  arena_free(ui->arena);
+func void ui_state_free(UI_state *ui) {
   arena_free(ui->build_arena);
   arena_free(ui->temp);
   arena_free(ui->draw_arena);
-  os_free(ui);
+  arena_free(ui->arena);
+}
+
+func void ui_state_select(UI_state *state) {
+  ui_state = state;
+}
+
+func UI_state* ui_state_get_selected(void) {
+  return ui_state;
 }
 
 func UI_key ui_key_nil(void) {
@@ -96,13 +104,13 @@ func b32 ui_key_match(UI_key a, UI_key b) {
   return match;
 }
 
-func UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
+func UI_box* ui_get_box_from_key(UI_key key) {
   UI_box *result = 0;
 
   if(!ui_key_match(key, ui_key_nil())) {
     u64 slot = key.hash % MAX_TABLE_SLOTS;
 
-    for(UI_box *b = ui->box_table[slot].first; b; b = b->hash_next) {
+    for(UI_box *b = ui_state->box_table[slot].first; b; b = b->hash_next) {
       if(ui_key_match(key, b->key)) {
         result = b;
         break;
@@ -114,33 +122,33 @@ func UI_box* ui_get_box_from_key(UI_context *ui, UI_key key) {
   return result;
 }
 
-func UI_box* ui_get_box_from_str(UI_context *ui, Str8 s) {
-  return ui_get_box_from_key(ui, ui_key_from_str(s));
+func UI_box* ui_get_box_from_str(Str8 s) {
+  return ui_get_box_from_key(ui_key_from_str(s));
 }
 
-func UI_key ui_hot_box_key(UI_context *ui) {
-  return ui->hot_box_key;
+func UI_key ui_hot_box_key(void) {
+  return ui_state->hot_box_key;
 }
 
-func UI_key ui_drop_hot_box_key(UI_context *ui) {
-  return ui->drop_hot_box_key;
+func UI_key ui_drop_hot_box_key(void) {
+  return ui_state->drop_hot_box_key;
 }
 
-func UI_key ui_active_box_key(UI_context *ui, UI_mouse_button btn) {
-  return ui->active_box_key[btn];
+func UI_key ui_active_box_key(UI_mouse_button btn) {
+  return ui_state->active_box_key[btn];
 }
 
-func UI_box* ui_make_transient_box(UI_context *ui, UI_box_flags flags) {
-  return ui_make_box_from_key(ui, flags, ((UI_key){0}));
+func UI_box* ui_make_transient_box(UI_box_flags flags) {
+  return ui_make_box_from_key(flags, ((UI_key){0}));
 }
 
-func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key) {
+func UI_box* ui_make_box_from_key(UI_box_flags flags, UI_key key) {
 
 #define X(lower, lower_alt, type, init, stack_size) type cur_##lower = ui_prop_top(lower);
   UI_PROPERTIES;
 #undef X
 
-  UI_box *box = ui_get_box_from_key(ui, key);
+  UI_box *box = ui_get_box_from_key(key);
 
   b32 is_box_first_frame = !box;
 
@@ -149,15 +157,15 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
   b32 box_is_transient = ui_key_match(key, ui_key_nil());
 
   if(is_box_first_frame) {
-    box = !box_is_transient ? ui->box_free_list : 0;
+    box = !box_is_transient ? ui_state->box_free_list : 0;
     if(box) {
-      sll_stack_pop(ui->box_free_list);
+      sll_stack_pop(ui_state->box_free_list);
     } else {
-      box = push_struct_no_zero(box_is_transient ? ui->build_arena : ui->arena, UI_box);
+      box = push_struct_no_zero(box_is_transient ? ui_state->build_arena : ui_state->arena, UI_box);
     }
     memory_zero(box, sizeof(UI_box));
 
-    box->debug_id = ui->debug_id_counter++;
+    box->debug_id = ui_state->debug_id_counter++;
   }
 
   {
@@ -168,9 +176,9 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
   }
 
   if(is_box_first_frame && !box_is_transient) {
-    box->first_visited_build_index = ui->build_index;
+    box->first_visited_build_index = ui_state->build_index;
     u64 slot = key.hash % MAX_TABLE_SLOTS;
-    dll_push_back_np(ui->box_table[slot].first, ui->box_table[slot].last, box, hash_next, hash_prev);
+    dll_push_back_np(ui_state->box_table[slot].first, ui_state->box_table[slot].last, box, hash_next, hash_prev);
   }
 
   if(cur_parent) {
@@ -180,19 +188,19 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
   }
 
   box->key = key;
-  box->last_visited_build_index = ui->build_index;
+  box->last_visited_build_index = ui_state->build_index;
 
 #define X(lower, lower_alt, type, init, stack_size) memory_copy(&box->lower_alt, &cur_##lower, sizeof(cur_##lower));
   UI_STYLE_PROPERTIES;
   UI_OTHER_PROPERTIES;
 #undef X
 
-  if(ui->fixed_width_stack.count > 0) {
+  if(ui_state->fixed_width_stack.count > 0) {
     box->flags |= UI_BOX_FLAG_FIXED_WIDTH;
     box->fixed_size[0] = cur_fixed_width;
   }
 
-  if(ui->fixed_height_stack.count > 0) {
+  if(ui_state->fixed_height_stack.count > 0) {
     box->flags |= UI_BOX_FLAG_FIXED_HEIGHT;
     box->fixed_size[1] = cur_fixed_height;
   }
@@ -201,8 +209,8 @@ func UI_box* ui_make_box_from_key(UI_context *ui, UI_box_flags flags, UI_key key
   box->min_size[1] = cur_min_height;
 
 #define X(lower, lower_alt, type, init, stack_size) \
-  if(ui->lower##_auto_pop) { \
-    ui->lower##_auto_pop = 0; \
+  if(ui_state->lower##_auto_pop) { \
+    ui_state->lower##_auto_pop = 0; \
     ui_prop_pop(lower); \
   }
   UI_STYLE_PROPERTIES;
@@ -223,10 +231,10 @@ func Str8 ui_strip_id_from_text(Str8 text) {
   return text;
 }
 
-func UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flags flags, Str8 str) {
+func UI_box* ui_make_box_from_str(UI_box_flags flags, Str8 str) {
   UI_key key = ui_key_from_str(str);
 
-  UI_box *box = ui_make_box_from_key(ui, flags, key);
+  UI_box *box = ui_make_box_from_key(flags, key);
 
   if(box->flags & UI_BOX_FLAG_DRAW_TEXT) {
     box->text = ui_strip_id_from_text(str);
@@ -235,29 +243,29 @@ func UI_box* ui_make_box_from_str(UI_context *ui, UI_box_flags flags, Str8 str) 
   return box;
 }
 
-func UI_box* ui_make_box_from_strf(UI_context *ui, UI_box_flags flags, char *fmt, ...) {
+func UI_box* ui_make_box_from_strf(UI_box_flags flags, char *fmt, ...) {
   UI_box *box = NULL;
 
   va_list args;
   va_start(args, fmt);
-  Str8 str = str8fv(ui->temp, fmt, args);
+  Str8 str = str8fv(ui_state->temp, fmt, args);
   va_end(args);
 
-  box = ui_make_box_from_str(ui, flags, str);
+  box = ui_make_box_from_str(flags, str);
 
   return box;
 }
 
-func Vector2 ui_drag_delta(UI_context *ui) {
-  return Vector2Subtract(ui->mouse_pos, ui->drag_start_pos);
+func Vector2 ui_drag_delta(UI_state *ui) {
+  return Vector2Subtract(ui_state->mouse_pos, ui_state->drag_start_pos);
 }
 
-func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
+func UI_signal ui_signal_from_box(UI_box *box) {
   b32 taken = 0;
 
   UI_signal sig = { .box = box };
 
-  UI_event _event = ui_get_event(ui);
+  UI_event _event = ui_get_event();
   UI_event *event = &_event;
 
   Rectangle box_rec =
@@ -281,14 +289,14 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     }
   }
 
-  b8 mouse_in_bounds = CheckCollisionPointRec(ui->mouse_pos, box_rec);
+  b8 mouse_in_bounds = CheckCollisionPointRec(ui_state->mouse_pos, box_rec);
 
 #if 0
   if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
       mouse_in_bounds)
   {
     sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
-    ui->hot_box_key = box->key;
+    ui_state->hot_box_key = box->key;
   }
 #endif
 
@@ -303,35 +311,35 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     {
       taken = 1;
       sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS << btn);
-      ui->active_box_key[btn] = box->key;
-      ui->drag_start_pos = ui->mouse_pos;
+      ui_state->active_box_key[btn] = box->key;
+      ui_state->drag_start_pos = ui_state->mouse_pos;
     }
 
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
         (event->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE) &&
         btn_on &&
-        ui_key_match(ui_active_box_key(ui, btn), box->key) &&
-        ui_key_match(ui_hot_box_key(ui), box->key) &&
+        ui_key_match(ui_active_box_key(btn), box->key) &&
+        ui_key_match(ui_hot_box_key(), box->key) &&
         mouse_in_bounds
       )
     {
       taken = 1;
       sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE << btn);
       sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_CLICK << btn);
-      ui->active_box_key[btn] = ui_key_nil();
+      ui_state->active_box_key[btn] = ui_key_nil();
     }
 
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
         (event->input_flags & UI_INPUT_FLAG_MOUSE_RELEASE) &&
         btn_on &&
-        ui_key_match(ui_active_box_key(ui, btn), box->key) &&
+        ui_key_match(ui_active_box_key(btn), box->key) &&
         !mouse_in_bounds
       )
     {
       taken = 1;
       sig.flags |= (UI_SIGNAL_FLAG_LEFT_MOUSE_RELEASE << btn);
-      ui->hot_box_key = ui_key_nil();
-      ui->active_box_key[btn] = ui_key_nil();
+      ui_state->hot_box_key = ui_key_nil();
+      ui_state->active_box_key[btn] = ui_key_nil();
     }
 
 #if 0
@@ -346,11 +354,11 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
     }
 #endif
     if((box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE) &&
-      ui_key_match(ui->active_box_key[btn], box->key) &&
-      !ui_key_match(ui->active_box_key[btn], ui_key_nil()))
+      ui_key_match(ui_state->active_box_key[btn], box->key) &&
+      !ui_key_match(ui_state->active_box_key[btn], ui_key_nil()))
     {
-      ui->hot_box_key = box->key;
-      ui->active_box_key[btn] = box->key;
+      ui_state->hot_box_key = box->key;
+      ui_state->active_box_key[btn] = box->key;
       sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | (UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG << btn);
     }
 
@@ -359,29 +367,29 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
   {
     if(box->flags & UI_BOX_FLAG_MOUSE_CLICKABLE &&
         mouse_in_bounds &&
-        (ui_key_match(ui->hot_box_key, ui_key_nil()) || ui_key_match(ui->hot_box_key, box->key)) &&
-        (ui_key_match(ui->active_box_key[UI_MOUSE_BUTTON_LEFT], ui_key_nil()) || ui_key_match(ui->active_box_key[UI_MOUSE_BUTTON_LEFT], box->key)) &&
-        (ui_key_match(ui->active_box_key[UI_MOUSE_BUTTON_MIDDLE], ui_key_nil()) || ui_key_match(ui->active_box_key[UI_MOUSE_BUTTON_MIDDLE], box->key)) &&
-        (ui_key_match(ui->active_box_key[UI_MOUSE_BUTTON_RIGHT], ui_key_nil()) || ui_key_match(ui->active_box_key[UI_MOUSE_BUTTON_RIGHT], box->key)))
+        (ui_key_match(ui_state->hot_box_key, ui_key_nil()) || ui_key_match(ui_state->hot_box_key, box->key)) &&
+        (ui_key_match(ui_state->active_box_key[UI_MOUSE_BUTTON_LEFT], ui_key_nil()) || ui_key_match(ui_state->active_box_key[UI_MOUSE_BUTTON_LEFT], box->key)) &&
+        (ui_key_match(ui_state->active_box_key[UI_MOUSE_BUTTON_MIDDLE], ui_key_nil()) || ui_key_match(ui_state->active_box_key[UI_MOUSE_BUTTON_MIDDLE], box->key)) &&
+        (ui_key_match(ui_state->active_box_key[UI_MOUSE_BUTTON_RIGHT], ui_key_nil()) || ui_key_match(ui_state->active_box_key[UI_MOUSE_BUTTON_RIGHT], box->key)))
     {
-      ui->hot_box_key = box->key;
+      ui_state->hot_box_key = box->key;
       sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
     }
   }
   
   if(box->flags & UI_BOX_FLAG_DROP_SITE &&
       mouse_in_bounds &&
-      (ui_key_match(ui->drop_hot_box_key, ui_key_nil()) || ui_key_match(ui->drop_hot_box_key, box->key)))
+      (ui_key_match(ui_state->drop_hot_box_key, ui_key_nil()) || ui_key_match(ui_state->drop_hot_box_key, box->key)))
   {
-    ui->drop_hot_box_key = box->key;
+    ui_state->drop_hot_box_key = box->key;
   }
 
 
   if(box->flags & UI_BOX_FLAG_DROP_SITE &&
       !mouse_in_bounds &&
-      ui_key_match(ui->drop_hot_box_key, box->key))
+      ui_key_match(ui_state->drop_hot_box_key, box->key))
   {
-    ui->drop_hot_box_key = ui_key_nil();
+    ui_state->drop_hot_box_key = ui_key_nil();
   }
 
   { /* scrolling */
@@ -394,8 +402,8 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
       SWAP(delta[0], delta[1], s16);
     }
 
-    delta[0] *= ui->scroll_rate;
-    delta[1] *= ui->scroll_rate;
+    delta[0] *= ui_state->scroll_rate;
+    delta[1] *= ui_state->scroll_rate;
 
     if(box->flags & UI_BOX_FLAG_INVERT_SCROLL) {
       delta[0] *= -1.0f;
@@ -464,16 +472,16 @@ func UI_signal ui_signal_from_box(UI_context *ui, UI_box *box) {
   } /* scrolling */
 
   if(taken) {
-    ui->took_input_event = 1;
+    ui_state->took_input_event = 1;
   }
 
   return sig;
 }
 
-func UI_event ui_get_event(UI_context *ui) {
+func UI_event ui_get_event(void) {
   UI_permission_flags perms = ui_permission_flags_top();
 
-  UI_event event = ui->input_event;
+  UI_event event = ui_state->input_event;
 
   UI_permission_flags mouse_button_perms =
     (perms & (UI_PERMISSION_FLAG_CLICKS_LEFT | UI_PERMISSION_FLAG_CLICKS_MIDDLE | UI_PERMISSION_FLAG_CLICKS_RIGHT));
@@ -498,12 +506,12 @@ func UI_event ui_get_event(UI_context *ui) {
   return event;
 }
 
-func void ui_get_frame_input(UI_context *ui) {
-  UI_event *event = &ui->input_event;
+func void ui_get_frame_input(void) {
+  UI_event *event = &ui_state->input_event;
 
   *event = (UI_event){0};
 
-  ui->took_input_event = 0;
+  ui_state->took_input_event = 0;
 
   event->input_flags = 0;
   event->mouse_buttons_active = 0;
@@ -539,7 +547,7 @@ func void ui_get_frame_input(UI_context *ui) {
   /* NOTE(~jfd 29/07/25)
    *
    * Temporarily using IsKeyDown() instead of saving the modifier_keys across frames
-   * so that I can reset the whole ui->input_event struct each frame.
+   * so that I can reset the whole ui_state->input_event struct each frame.
    */
 #define X(mod) \
   if(IsKeyDown(KEY_LEFT_##mod) || IsKeyDown(KEY_RIGHT_##mod)) { \
@@ -570,16 +578,16 @@ func void ui_get_frame_input(UI_context *ui) {
 
 }
 
-func void ui_begin_build(UI_context *ui) {
-  arena_clear(ui->build_arena);
-  arena_clear(ui->temp);
+func void ui_begin_build(void) {
+  arena_clear(ui_state->build_arena);
+  arena_clear(ui_state->temp);
 
-  ui->build_index++;
+  ui_state->build_index++;
 
-  UI_box *dummy = ui->dummy;
+  UI_box *dummy = ui_state->dummy;
   memory_zero(dummy, sizeof(UI_box));
 
-  ui->root = dummy;
+  ui_state->root = dummy;
 
 #define X(lower, lower_alt, type, init, stack_size) \
   ui_prop_push(lower, init);
@@ -590,31 +598,31 @@ func void ui_begin_build(UI_context *ui) {
 
 #define X(lower, lower_alt, type, init, stack_size) \
   type cur_##lower = ui_prop_top(lower); \
-  memory_copy(&ui->root->lower_alt, &cur_##lower, sizeof(type));
+  memory_copy(&ui_state->root->lower_alt, &cur_##lower, sizeof(type));
   UI_STYLE_PROPERTIES;
   UI_OTHER_PROPERTIES;
 #undef X
 
-  ui_prop_push(parent, ui->root);
+  ui_prop_push(parent, ui_state->root);
 
-  ui_get_frame_input(ui);
-  ui->mouse_pos = ui->input_event.mouse_pos;
+  ui_get_frame_input();
+  ui_state->mouse_pos = ui_state->input_event.mouse_pos;
 
   {
     b32 has_active = 0;
     for(UI_mouse_button btn = UI_MOUSE_BUTTON_LEFT; btn < UI_MOUSE_BUTTON_COUNT; btn++) {
-      if(!ui_key_match(ui->active_box_key[btn], ui_key_nil())) {
+      if(!ui_key_match(ui_state->active_box_key[btn], ui_key_nil())) {
         has_active = 1;
       }
     }
 
     if(!has_active) {
-      ui->hot_box_key = ui_key_nil();
+      ui_state->hot_box_key = ui_key_nil();
     }
   }
 
   {
-    ui->drop_hot_box_key = ui_key_nil();
+    ui_state->drop_hot_box_key = ui_key_nil();
   }
 
 }
@@ -705,9 +713,9 @@ end:;
   return sum;
 }
 
-func void ui_end_build(UI_context *ui) {
+func void ui_end_build(void) {
 
-  ui->debug_id_counter = 0;
+  ui_state->debug_id_counter = 0;
 
 #define X(lower, lower_alt, type, init, stack_size) ui_clear_prop(lower);
   UI_PROPERTIES;
@@ -716,16 +724,16 @@ func void ui_end_build(UI_context *ui) {
 
   /* prune box tree */
   for(u64 table_i = 0; table_i < MAX_TABLE_SLOTS; table_i++) {
-    UI_box *box = ui->box_table[table_i].first;
+    UI_box *box = ui_state->box_table[table_i].first;
     for(; box; box = box->hash_next) {
-      if(box->last_visited_build_index < ui->build_index || ui_key_match(box->key, ui_key_nil())) {
+      if(box->last_visited_build_index < ui_state->build_index || ui_key_match(box->key, ui_key_nil())) {
         dll_remove_np(
-            ui->box_table[table_i].first,
-            ui->box_table[table_i].last,
+            ui_state->box_table[table_i].first,
+            ui_state->box_table[table_i].last,
             box,
             hash_next,
             hash_prev);
-        sll_stack_push(ui->box_free_list, box);
+        sll_stack_push(ui_state->box_free_list, box);
       }
     }
   }
@@ -736,7 +744,7 @@ func void ui_end_build(UI_context *ui) {
       UI_PROFILE(ui_prof_time_to_calc_absolute_sized_boxes)
       { /* visit nodes with UI_SIZE_PIXELS or UI_SIZE_TEXT_CONTENT */
 
-        for(UI_box *node = ui->root; node;) {
+        for(UI_box *node = ui_state->root; node;) {
 
           ASSERT(node);
 
@@ -750,11 +758,11 @@ func void ui_end_build(UI_context *ui) {
                 node->fixed_size[axis] = size.value;
               } break;
             case UI_SIZE_TEXT_CONTENT:
-              arena_scope(ui->build_arena) {
+              arena_scope(ui_state->build_arena) {
 
                 Vector2 text_size =
                   MeasureTextPro(
-                      ui->fonts[node->font_id],
+                      ui_state->fonts[node->font_id],
                       (char*)node->text.s,
                       (int)node->text.len,
                       node->font_size,
@@ -787,7 +795,7 @@ func void ui_end_build(UI_context *ui) {
       UI_PROFILE(ui_prof_time_to_calc_percent_sized_boxes)
       { /* visit nodes with UI_SIZE_PERCENT_OF_PARENT in pre order */
 
-        for(UI_box *node = ui->root; node;) {
+        for(UI_box *node = ui_state->root; node;) {
 
           UI_size size = node->semantic_size[axis];
           f32 size_value = 0.0f;
@@ -824,13 +832,13 @@ func void ui_end_build(UI_context *ui) {
 
       UI_PROFILE(ui_prof_time_to_calc_sum_sized_boxes)
       {
-        ui_calc_downward_dependent_sizes(ui->root, axis, ui->root->child_layout_axis);
+        ui_calc_downward_dependent_sizes(ui_state->root, axis, ui_state->root->child_layout_axis);
       }
 
       UI_PROFILE(ui_prof_time_to_solve_size_violations)
       { /* solve size violations in a pre order traversal */
 
-        for(UI_box *node = ui->root; node;) {
+        for(UI_box *node = ui_state->root; node;) {
 
           if(axis != node->child_layout_axis && !(node->flags & (UI_BOX_FLAG_OVERFLOW_X << axis))) {
             f32 allowed_size = node->fixed_size[axis];
@@ -863,9 +871,9 @@ func void ui_end_build(UI_context *ui) {
 
             f32 violation = total_size - total_allowed_size;
             
-            if(violation > 0 && total_weighted_size > 0) arena_scope(ui->build_arena)
+            if(violation > 0 && total_weighted_size > 0) arena_scope(ui_state->build_arena)
             {
-              f32 *child_fixups = push_array(ui->build_arena, f32, node->child_count);
+              f32 *child_fixups = push_array(ui_state->build_arena, f32, node->child_count);
 
               {
                 u64 child_index = 0;
@@ -928,7 +936,7 @@ func void ui_end_build(UI_context *ui) {
 
     for(UI_axis axis = UI_AXIS_X; axis < UI_AXIS_COUNT; axis++) {
 
-      for(UI_box *node = ui->root; node;) {
+      for(UI_box *node = ui_state->root; node;) {
 
         f32 layout_position = 0;
         f32 bounds = 0;
@@ -987,10 +995,10 @@ func void ui_end_build(UI_context *ui) {
 
 }
 
-func UI_box_node* ui_push_box_node(UI_context *ui) {
+func UI_box_node* ui_push_box_node(void) {
   UI_box_node *node = 0;
 
-  node = push_struct(ui->draw_arena, UI_box_node);
+  node = push_struct(ui_state->draw_arena, UI_box_node);
 
   return node;
 }
@@ -1074,7 +1082,7 @@ func void dump_UI_box(const UI_box *box) {
 
 //int dumped = 2;
 
-func void ui_draw(UI_context *ui) {
+func void ui_draw(void) {
   
   //if(dumped > 0) {
   //  printf("====== BEGIN DRAW DUMP ======\n");
@@ -1082,9 +1090,9 @@ func void ui_draw(UI_context *ui) {
   //
   //int depth = 0;
 
-  for(UI_box *box = ui->root; box;) {
+  for(UI_box *box = ui_state->root; box;) {
 
-    //TraceLog(LOG_DEBUG, "drawing %s", cstrf(ui->temp, "'%S' %li", box->key.src_str, box->key.hash));
+    //TraceLog(LOG_DEBUG, "drawing %s", cstrf(ui_state->temp, "'%S' %li", box->key.src_str, box->key.hash));
 
     Rectangle rec =
     {
@@ -1162,15 +1170,15 @@ func void ui_draw(UI_context *ui) {
 
     }
 
-    if(box->flags & UI_BOX_FLAG_DRAW_TEXT) arena_scope(ui->draw_arena) {
+    if(box->flags & UI_BOX_FLAG_DRAW_TEXT) arena_scope(ui_state->draw_arena) {
 
-      char *text_cstr = cstr_copy_str8(ui->draw_arena, box->text);
+      char *text_cstr = cstr_copy_str8(ui_state->draw_arena, box->text);
 
       f32 box_mid_x = (box->final_rect_max[0] + box->final_rect_min[0]) * 0.5f;
       f32 box_mid_y = (box->final_rect_max[1] + box->final_rect_min[1]) * 0.5f;
       Vector2 text_size =
         MeasureTextEx(
-            ui->fonts[box->font_id],
+            ui_state->fonts[box->font_id],
             text_cstr,
             box->font_size,
             box->font_spacing);
@@ -1196,7 +1204,7 @@ func void ui_draw(UI_context *ui) {
       }
 
       DrawTextEx(
-          ui->fonts[box->font_id],
+          ui_state->fonts[box->font_id],
           text_cstr,
           text_pos,
           box->font_size,
@@ -1210,14 +1218,14 @@ func void ui_draw(UI_context *ui) {
     }
 
 #if 0
-    arena_scope(ui->temp) {
+    arena_scope(ui_state->temp) {
 
 
 #if 0
       SetTextLineSpacing(1);
       {
         Str8 dump = 
-            str8f(ui->temp,
+            str8f(ui_state->temp,
               "%*sx = %f\ty = %f\n\n"
               "%*swidth = %f\theight = %f\n\n"
               "%*shash = %li\t\t\tsrc_str = %S\n"
@@ -1280,9 +1288,9 @@ func void ui_draw(UI_context *ui) {
 
     }
 
-  } /* for(UI_box_node *node = ui->root; node;) */
+  } /* for(UI_box_node *node = ui_state->root; node;) */
 
-  arena_clear(ui->draw_arena);
+  arena_clear(ui_state->draw_arena);
 
   //if(dumped > 0) {
   //  printf("====== END DRAW DUMP ======\n");

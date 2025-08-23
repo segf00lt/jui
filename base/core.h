@@ -24,6 +24,7 @@
 #endif
 
 #define _POSIX_C_SOURCE 200809L
+//#define _POSIX_C_SOURCE 199309L
 
 # elif defined(__APPLE__) && defined(__MACH__)
 #  define OS_MAC 1
@@ -357,6 +358,8 @@ typedef void* void_ptr;
 typedef char* char_ptr;
 typedef char* Cstr;
 
+typedef void Void_func(void);
+
 typedef enum Weekday {
   WEEKDAY_SUN = 0,
   WEEKDAY_MON,
@@ -419,6 +422,7 @@ func Dense_time dense_time_from_date_time(Date_time date_time);
 func Date_time date_time_from_dense_time(Dense_time time);
 func Date_time date_time_from_micro_seconds(u64 time);
 func Date_time date_time_from_unix_time(u64 unix_time);
+func Dense_time dense_time_from_unix_time(u64 unix_time);
 
 
 #endif

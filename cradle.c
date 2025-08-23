@@ -1,5 +1,3 @@
-#include "base.h"
-
 #include <dlfcn.h>
 
 #include "raylib.h"
@@ -10,10 +8,8 @@ typedef void* (*Module_proc)(void *);
 
 int main(void) {
 
-  //context_init();
-
   void *module = dlopen(GAME_MODULE_PATH, RTLD_NOW);
-  s64 module_modtime = GetFileModTime(GAME_MODULE_PATH);
+  long module_modtime = GetFileModTime(GAME_MODULE_PATH);
 
   if(module) {
     TraceLog(LOG_INFO, "successfully loaded module code");
@@ -22,9 +18,9 @@ int main(void) {
     return 1;
   }
 
-  Module_proc module_init_proc            = (Module_proc)dlsym(module, "module_init");
-  Module_proc module_close_proc           = (Module_proc)dlsym(module, "module_close");
-  Module_proc module_main_proc            = (Module_proc)dlsym(module, "module_main");
+  Module_proc module_init_proc     = (Module_proc)dlsym(module, "module_init");
+  Module_proc module_close_proc    = (Module_proc)dlsym(module, "module_close");
+  Module_proc module_main_proc     = (Module_proc)dlsym(module, "module_main");
   Module_proc module_unload_proc   = (Module_proc)dlsym(module, "module_unload");
   Module_proc module_load_proc     = (Module_proc)dlsym(module, "module_load");
 
@@ -32,7 +28,7 @@ int main(void) {
 
   while(module_main_proc(state)) {
 
-    s64 modtime = GetFileModTime(GAME_MODULE_PATH);
+    long modtime = GetFileModTime(GAME_MODULE_PATH);
     if(module_modtime != modtime) {
       TraceLog(LOG_INFO, "reloading module code");
       module_modtime = modtime;

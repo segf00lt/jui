@@ -5,6 +5,7 @@
 #include "base/arena.h"
 #include "base/str.h"
 #include "base/array.h"
+#include "base/thread_context.h"
 
 #include "os/os.h"
 
@@ -17,6 +18,7 @@
 #include "base/arena.c"
 #include "base/str.c"
 #include "base/array.c"
+#include "base/thread_context.c"
 
 #include "os/os.c"
 

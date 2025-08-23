@@ -1,5 +1,7 @@
 #include "ui_test.c"
 
+// TODO make the cradle layer for entry points and stuff
+
 void *module_init(void*);
 void *module_close(void*);
 void *module_main(void*);
@@ -37,6 +39,9 @@ void *module_load(void* _gp) {
   Game *gp = _gp;
 
   //Clay_SetCurrentContext(gp->clay_context);
+
+  os_state_select(gp->os_state);
+  ui_state_select(gp->ui_state);
 
   game_load_assets(gp);
 

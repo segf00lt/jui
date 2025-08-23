@@ -364,11 +364,11 @@ int build_raylib(void) {
   Str8 raylib_debug_build_dir = str8f(main_arena, "%S/debug", raylib_build_dir);
   Str8 raylib_web_build_dir = str8f(main_arena, "%S/web", raylib_build_dir);
 
-  ASSERT(os_make_dir((char*)raylib_build_dir.s));
-  ASSERT(os_make_dir((char*)raylib_static_build_dir.s));
-  ASSERT(os_make_dir((char*)raylib_shared_build_dir.s));
-  ASSERT(os_make_dir((char*)raylib_debug_build_dir.s));
-  ASSERT(os_make_dir((char*)raylib_web_build_dir.s));
+  ASSERT(os_make_dir(raylib_build_dir));
+  ASSERT(os_make_dir(raylib_static_build_dir));
+  ASSERT(os_make_dir(raylib_shared_build_dir));
+  ASSERT(os_make_dir(raylib_debug_build_dir));
+  ASSERT(os_make_dir(raylib_web_build_dir));
 
   Str8 raylib_static_lib_path = str8f(main_arena, "%S/libraylib.a", raylib_static_build_dir);
   Str8 raylib_shared_lib_path = str8f(main_arena, "%S/%S", raylib_shared_build_dir, raylib_shared_lib_name);
@@ -609,7 +609,7 @@ int build_hot_reload(void) {
 
   nob_log(NOB_INFO, "building in hot reload mode");
 
-  nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", SHARED, "module.c", INCLUDE_AND_LINK_OPTIONS, "-o", GAME_MODULE, "-lm");
+  nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", SHARED, "module.c", "-I./third_party/raylib/", /*INCLUDE_AND_LINK_OPTIONS,*/ "-o", GAME_MODULE, "-lm");
   Nob_Proc p1 = nob_cmd_run_async_and_reset(&cmd);
 
   nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", "-DGAME_MODULE_PATH=\""GAME_MODULE_PATH"\"", "cradle.c", INCLUDE_AND_LINK_OPTIONS, "-o", EXE, "-lm");
@@ -739,7 +739,7 @@ int load_nob_project_file(void) {
         return 1;
       }
     } else {
-      os_set_current_dir(main_arena, cur_dir);
+      os_set_current_dir(cur_dir);
       break;
     }
   }
@@ -769,6 +769,8 @@ int load_nob_project_file(void) {
 
 int main(int argc, char **argv) {
 
+  os_init();
+
   main_arena = arena_alloc(MB(4));
 
 #if 0
@@ -784,7 +786,7 @@ int main(int argc, char **argv) {
 
   load_nob_project_file();
 
-  ASSERT(os_set_current_dir(main_arena, project_root_path));
+  ASSERT(os_set_current_dir(project_root_path));
 
   NOB_GO_REBUILD_URSELF(argc, argv);
 
@@ -798,9 +800,21 @@ int main(int argc, char **argv) {
   //if(!build_release()) return 1;
   //if(!build_wasm()) return 1;
   //if(!build_itch()) return 1;
-  if(!build_hot_reload_no_cradle()) return 1;
-  //if(!build_hot_reload()) return 1;
+  //if(!build_hot_reload_no_cradle()) return 1;
+  if(!build_hot_reload()) return 1;
+  //if(!build_hot_reload_cradle()) return 1;
 
+#if 1
+  {
+    Nob_Cmd cmd = {0};
+
+    nob_log(NOB_INFO, "building test");
+
+    nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", "threading_test.c", INCLUDE_AND_LINK_OPTIONS, "-o", "test", "-lm");
+
+    if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
+  }
+#endif
 
   return 0;
 }

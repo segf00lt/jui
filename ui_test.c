@@ -89,11 +89,13 @@ struct Game {
 
   u64 frame_index;
 
+  u64 main_arena_reset_pos;
   Arena *main_arena;
   Arena *frame_arena;
   Arena *level_arena;
 
-  UI_context *ui;
+  void *os_state;
+  UI_state *ui_state;
 
   b32  loaded_files;
   Str8 files[MAX_FILES];
@@ -162,27 +164,36 @@ Vector2 save_window_pos2;
 
 func Game* game_init(void) {
 
-  SetRandomSeed(42);
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-  InitWindow(1000, 800, GAME_TITLE);
-  //InitAudioDevice();
-  //DisableCursor();
+  { /* raylib_init */
+    SetRandomSeed(42);
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+    InitWindow(1000, 800, GAME_TITLE);
+    //InitAudioDevice();
+    //DisableCursor();
 
-  //SetMasterVolume(GetMasterVolume() * 0.5);
+    //SetMasterVolume(GetMasterVolume() * 0.5);
 
-  SetTargetFPS(TARGET_FPS);
-  SetTextLineSpacing(text_line_spacing);
-  SetTraceLogLevel(LOG_DEBUG);
-  SetExitKey(0);
+    SetTargetFPS(TARGET_FPS);
+    SetTextLineSpacing(text_line_spacing);
+    SetTraceLogLevel(LOG_DEBUG);
+    SetExitKey(0);
+  } /* raylib_init */
 
-  Game *gp = os_alloc(sizeof(Game));
-  memory_set(gp, 0, sizeof(Game));
+  void *os_state = os_state_alloc();
 
-  gp->main_arena  = arena_alloc(MB(3));
+  Arena *main_arena = arena_alloc(MB(4));
+  Game *gp = push_struct(main_arena, Game);
+
+  gp->main_arena_reset_pos = arena_pos(main_arena);
+
+  gp->os_state = os_state;
+
+  gp->main_arena  = main_arena;
   gp->level_arena = arena_alloc(KB(16));
   gp->frame_arena = arena_alloc(KB(16));
 
-  gp->ui = ui_init();
+  gp->ui_state = ui_state_alloc();
+  ui_state_select(gp->ui_state);
 
   game_load_assets(gp);
 
@@ -202,7 +213,8 @@ func void game_unload_assets(Game *gp) {
 func void game_close(Game *gp) {
   game_unload_assets(gp);
 
-  ui_close(gp->ui);
+  ui_state_free(gp->ui_state);
+  os_state_free(gp->os_state);
 
   CloseWindow();
   //CloseAudioDevice();
@@ -210,7 +222,7 @@ func void game_close(Game *gp) {
 
 func void game_reset(Game *gp) {
 
-  arena_clear(gp->main_arena);
+  arena_pop_to(gp->main_arena, gp->main_arena_reset_pos);
   arena_clear(gp->frame_arena);
   arena_clear(gp->level_arena);
 
@@ -256,8 +268,6 @@ func void game_reset(Game *gp) {
 }
 
 func UI_signal item_button(Game *gp, Item_node *item) {
-  UI_context *ui = gp->ui;
-
   UI_signal sig = {0}; 
 
   ui_text_align(UI_TEXT_ALIGN_CENTER)
@@ -265,24 +275,24 @@ func UI_signal item_button(Game *gp, Item_node *item) {
     ui_font_size(20.0f)
     ui_font_spacing(2.0f)
 
-    sig = ui_button(gp->ui, item->text);
+    sig = ui_button(item->text);
 
   return sig;
 }
 
-func UI_signal begin_draggable_window(UI_context *ui, f32 x, f32 y, f32 w, f32 h, Str8 title) {
+func UI_signal begin_draggable_window(f32 x, f32 y, f32 w, f32 h, Str8 title) {
   UI_box *outer_box = 0;
   UI_box *inner_box = 0;
   UI_box *title_box = 0;
 
   ui_child_layout_axis(UI_AXIS_Y) ui_fixed_position(((Vector2){ x, y })) ui_fixed_width(w) ui_fixed_height(h)
 
-    outer_box = ui_make_box_from_str(ui,
+    outer_box = ui_make_box_from_str(
         UI_BOX_FLAG_FLOATING |
         //UI_BOX_FLAG_CLIP |
         UI_BOX_FLAG_OVERFLOW_Y |
         0,
-        str8_cat(ui->build_arena, title, str8_lit("##dummy_key12312"))); // NOTE when boxes don't have keys their sizes get cleared
+        str8_cat(ui_state->build_arena, title, str8_lit("##dummy_key12312"))); // NOTE when boxes don't have keys their sizes get cleared
 
   ui_parent(outer_box)
   {
@@ -297,7 +307,7 @@ func UI_signal begin_draggable_window(UI_context *ui, f32 x, f32 y, f32 w, f32 h
     ui_semantic_width(title_width) ui_semantic_height(title_height)
     ui_padding(8.0f)
 
-      title_box = ui_make_box_from_str(ui,
+      title_box = ui_make_box_from_str(
           UI_BOX_FLAG_DRAW_TEXT |
           UI_BOX_FLAG_DRAW_BACKGROUND |
           UI_BOX_FLAG_MOUSE_CLICKABLE |
@@ -308,12 +318,12 @@ func UI_signal begin_draggable_window(UI_context *ui, f32 x, f32 y, f32 w, f32 h
     ui_semantic_width(((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f }))
       ui_semantic_height(((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f }))
         ui_child_layout_axis(UI_AXIS_X)
-          box = ui_make_transient_box(ui,
+          box = ui_make_transient_box(
               0);
 
     ui_parent(box)
     {
-      ui_spacer(ui, ui_pixels(2.0f, 1.0f));
+      ui_spacer(ui_pixels(2.0f, 1.0f));
 
       UI_size inner_box_width  = ui_percent_of_parent(1.0f, 0.0f);
       UI_size inner_box_height = ui_children_sum(1.0f);
@@ -322,14 +332,14 @@ func UI_signal begin_draggable_window(UI_context *ui, f32 x, f32 y, f32 w, f32 h
         ui_border_size(2.0f) ui_corner_radius(0.0f)
         ui_child_layout_axis(UI_AXIS_Y)
 
-        inner_box = ui_make_box_from_str(ui,
+        inner_box = ui_make_box_from_str(
             UI_BOX_FLAG_DRAW_BACKGROUND |
             UI_BOX_FLAG_DRAW_BORDER |
             0,
-            str8_cat(ui->build_arena, title, str8_lit("##dummy_key1239782y3"))
+            str8_cat(ui_state->build_arena, title, str8_lit("##dummy_key1239782y3"))
             );
 
-      ui_spacer(ui, ui_pixels(2.0f, 1.0f));
+      ui_spacer(ui_pixels(2.0f, 1.0f));
 
     }
 
@@ -339,28 +349,26 @@ func UI_signal begin_draggable_window(UI_context *ui, f32 x, f32 y, f32 w, f32 h
 
   ui_prop_push(parent, inner_box);
 
-  UI_signal title_sig = ui_signal_from_box(ui, title_box);
+  UI_signal title_sig = ui_signal_from_box(title_box);
 
   Color background_color = title_box->background_color;
 
-  if(ui_key_match(ui_hot_box_key(ui), title_box->key)) {
+  if(ui_key_match(ui_hot_box_key(), title_box->key)) {
     title_box->background_color = ColorBrightness(background_color, 0.12f);
   }
 
-  if(ui_key_match(ui_active_box_key(ui, UI_MOUSE_BUTTON_LEFT), title_box->key)) {
+  if(ui_key_match(ui_active_box_key(UI_MOUSE_BUTTON_LEFT), title_box->key)) {
     title_box->background_color = ColorBrightness(background_color, -0.17f);
   }
 
   return title_sig;
 }
 
-func void end_draggable_window(UI_context *ui) {
+func void end_draggable_window(void) {
   ui_prop_pop(parent);
 }
 
 func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height) {
-  UI_context *ui = gp->ui;
-
   UI_box_flags flags =
     UI_BOX_FLAG_FLOATING |
     UI_BOX_FLAG_DRAW_BACKGROUND |
@@ -383,26 +391,26 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
     ui_semantic_width(main_width) ui_semantic_height(main_height)
     ui_fixed_position(list->pos)
 
-    main_box = ui_make_box_from_key(gp->ui, flags, ui_key_nil());
+    main_box = ui_make_box_from_key(flags, ui_key_nil());
 
   ui_parent(main_box)
   {
-    ui_spacer(ui, ui_pixels(padding, 1.0f));
+    ui_spacer(ui_pixels(padding, 1.0f));
 
     UI_box *box;
     ui_semantic_size(fit)
-      box = ui_make_box_from_key(gp->ui, 0, ui_key_nil());
+      box = ui_make_box_from_key(0, ui_key_nil());
 
     ui_child_layout_axis(UI_AXIS_X)
       ui_parent(box)
       {
-        ui_spacer(ui, ui_pixels(padding, 1.0f));
+        ui_spacer(ui_pixels(padding, 1.0f));
 
         ui_child_layout_axis(UI_AXIS_Y)
           ui_semantic_height(sum)
           ui_semantic_width(fit)
           inner_container_box =
-          ui_make_box_from_str(gp->ui,
+          ui_make_box_from_str(
               UI_BOX_FLAG_INVERT_SCROLL |
               UI_BOX_FLAG_CLAMP_VIEW |
               UI_BOX_FLAG_VIEW_SCROLL |
@@ -410,13 +418,13 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
               0,
               list->id);
 
-        ui_spacer(ui, ui_pixels(padding, 1.0f));
+        ui_spacer(ui_pixels(padding, 1.0f));
       }
 
-    ui_spacer(ui, ui_pixels(padding, 1.0f));
+    ui_spacer(ui_pixels(padding, 1.0f));
   }
 
-  UI_signal inner_sig = ui_signal_from_box(gp->ui, inner_container_box);
+  UI_signal inner_sig = ui_signal_from_box(inner_container_box);
   //UI_signal sig = ui_signal_from_box(gp->ui, main_box);
 
   return inner_sig;
@@ -428,11 +436,9 @@ func void game_update_and_draw(Game *gp) {
     game_reset(gp);
   }
 
-  UI_context *ui = gp->ui;
-
   gp->dt = Clamp(GetFrameTime(), MIN_FRAME_TIME, TARGET_FRAME_TIME);
 
-  ui->scroll_rate = 10.0f;
+  ui_state->scroll_rate = 10.0f;
 
   if(WindowShouldClose()) {
     gp->quit = 1;
@@ -440,13 +446,13 @@ func void game_update_and_draw(Game *gp) {
   }
 
 
-  ui_build(ui) {
+  ui_build() {
 
 #if 1
     {
       ui_font_size(20) ui_font_spacing(2)
         ui_border_color(LIGHTGRAY) ui_background_color(BROWN) ui_text_color(WHITE)
-        begin_draggable_window(ui, 500, 100, 500, 500, str8_lit("Test Window##12319283"));
+        begin_draggable_window(500, 100, 500, 500, str8_lit("Test Window##12319283"));
 
       UI_size width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0, .strictness = 0 };
       UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
@@ -459,7 +465,7 @@ func void game_update_and_draw(Game *gp) {
         // - arenas are a bit flimsy, creating scopes often causes weird bugs
         // - make more helpers you can compose: rows, columns, basic buttons, resizable containers
 
-        ui_spacer(ui, ui_pixels(6, 1));
+        ui_spacer(ui_pixels(6, 1));
 
         UI_signal sig = {0};
 
@@ -467,7 +473,7 @@ func void game_update_and_draw(Game *gp) {
           ui_semantic_width(width) ui_semantic_height(height)
           ui_border_size(2.0f)
           ui_corner_radius(0.2f)
-          sig = ui_button(ui, str8f(gp->frame_arena, "Button %i", i));
+          sig = ui_button(str8f(gp->frame_arena, "Button %i", i));
 
         if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_CLICK) {
           printf("Button %i was clicked\n", i);
@@ -477,67 +483,68 @@ func void game_update_and_draw(Game *gp) {
 
       ui_border_color(LIGHTGRAY) ui_border_size(1.0f)
       {
-        ui_divider(ui, ui_pixels(30, 0));
-        ui_divider(ui, ui_pixels(30, 0));
+        ui_divider(ui_pixels(30, 0));
       }
 
-      ui_inset_begin(ui, ui_pixels(10, 1), ui_pixels(10, 1), ui_pixels(20, 1), ui_pixels(20, 1));
+      ui_inset_begin(ui_pixels(10, 1), ui_pixels(10, 1), ui_pixels(0, 1), ui_pixels(20, 1));
 
       ui_background_color(ColorBrightness(GREEN, -0.3f)) ui_text_color(WHITE)
         ui_semantic_width(width) ui_semantic_height(height)
         ui_border_size(2.0f)
         ui_corner_radius(0.2f)
+        ui_padding(4)
+        ui_text_align(UI_TEXT_ALIGN_CENTER)
         ui_font_size(20)
 
-        ui_button(ui, str8f(gp->frame_arena, "Extra Button"));
+        ui_button(str8f(gp->frame_arena, "Extra Button"));
 
-      ui_spacer(ui, ui_pixels(30, 1));
+      ui_spacer(ui_pixels(30, 1));
 
       ui_semantic_width(ui_percent_of_parent(1, 0)) ui_semantic_height(ui_children_sum(1))
-      ui_row(ui) ui_background_color(RED) ui_padding(8.0f) ui_text_color(YELLOW) ui_border_color(MAROON) ui_border_size(2.0f) ui_corner_radius(0.2f)
+      ui_row() ui_background_color(RED) ui_padding(8.0f) ui_text_color(YELLOW) ui_border_color(MAROON) ui_border_size(2.0f) ui_corner_radius(0.2f)
       {
-        ui_column(ui)
+        ui_column()
         {
           UI_size between_buttons = ui_pixels(8, 0);
           ui_semantic_height(ui_text_content(1))
           {
-            ui_button(ui, str8_lit("Hello##left_0"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("I am##left_1"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("on the left##left_2"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("column##left_3"));
+            ui_button(str8_lit("Hello##left_0"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("I am##left_1"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("on the left##left_2"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("column##left_3"));
           }
         }
 
-        ui_spacer(ui, ui_pixels(20,0));
+        ui_spacer(ui_pixels(20,0));
 
-        ui_column(ui)
+        ui_column()
         {
           UI_size between_buttons = ui_pixels(8, 0);
           ui_semantic_height(ui_text_content(1))
           {
-            ui_button(ui, str8_lit("And##right_0"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("I am##right_1"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("on the right##right_2"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("column##right_3"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("...##right_4"));
-            ui_spacer(ui, between_buttons);
-            ui_button(ui, str8_lit("see?##right_5"));
+            ui_button(str8_lit("And##right_0"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("I am##right_1"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("on the right##right_2"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("column##right_3"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("...##right_4"));
+            ui_spacer(between_buttons);
+            ui_button(str8_lit("see?##right_5"));
           }
         }
       }
 
 
-      ui_inset_end(ui);
+      ui_inset_end();
 
 
-      end_draggable_window(ui);
+      end_draggable_window();
     }
 #endif
 
@@ -810,13 +817,13 @@ func void game_update_and_draw(Game *gp) {
   }
 
   defer_loop(BeginDrawing(), EndDrawing()) {
-    if(ui->took_input_event) {
+    if(ui_state->took_input_event) {
       ClearBackground(ColorBrightness(RED, -0.4));
     } else {
       ClearBackground(BLACK);
     }
 
-    ui_draw(ui);
+    ui_draw();
 
 #if 1
     { /* debug overlay */
@@ -831,7 +838,7 @@ func void game_update_and_draw(Game *gp) {
       X( time to do 1st pass,                           %f,        ui_prof_time_to_do_1st_pass) \
       X( time to solve size violations,                 %f,        ui_prof_time_to_solve_size_violations) \
       X( time to calc final positions,                  %f,        ui_prof_time_to_calc_positions) \
-      X( ui hot box key,                                %lu,       ui->hot_box_key.hash) \
+      X( ui hot box key,                                %lu,       ui_state->hot_box_key.hash) \
       // \
 
 
