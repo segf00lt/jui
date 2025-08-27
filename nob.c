@@ -6,7 +6,7 @@
 
 
 #define CC "clang"
-#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-DDEBUG"
+#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-unused-label", "-DDEBUG"
 #define RELEASE_FLAGS "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi"
 #define WASM_FLAGS "-Os", "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-pthreads-mem-growth"
 #define TARGET "ui_test.c"
@@ -292,35 +292,40 @@ Str8 _raylib_files_web[] = {
   str8_lit("raudio"),
 };
 
-const Slice(char_ptr) raylib_include_flags = { .d = _raylib_include_flags, .count = ARRLEN(_raylib_include_flags) };
+DECL_ARR_TYPE_NAME(char*, Nob_cstr_arr);
+DECL_SLICE_TYPE_NAME(char*, Nob_cstr_slice);
+DECL_ARR_TYPE_NAME(Str8, Nob_str8_arr);
+DECL_SLICE_TYPE_NAME(Str8, Nob_str8_slice);
 
-const Slice(char_ptr) raylib_cflags_mac       = { .d = _raylib_cflags_mac,        .count = ARRLEN(_raylib_cflags_mac)        };
-const Slice(char_ptr) raylib_debug_cflags_mac = { .d = _raylib_debug_cflags_mac,  .count = ARRLEN(_raylib_debug_cflags_mac)  };
+const Nob_cstr_slice raylib_include_flags = { .d = _raylib_include_flags, .count = ARRLEN(_raylib_include_flags) };
 
-const Slice(char_ptr) raylib_cflags_linux       = { .d = _raylib_cflags_linux,        .count = ARRLEN(_raylib_cflags_linux)        };
-const Slice(char_ptr) raylib_debug_cflags_linux = { .d = _raylib_debug_cflags_linux,  .count = ARRLEN(_raylib_debug_cflags_linux)  };
+const Nob_cstr_slice raylib_cflags_mac       = { .d = _raylib_cflags_mac,        .count = ARRLEN(_raylib_cflags_mac)        };
+const Nob_cstr_slice raylib_debug_cflags_mac = { .d = _raylib_debug_cflags_mac,  .count = ARRLEN(_raylib_debug_cflags_mac)  };
 
-const Slice(char_ptr) raylib_cflags_web       = { .d = _raylib_cflags_web,        .count = ARRLEN(_raylib_cflags_web)        };
-//Slice(char_ptr) raylib_debug_cflags_web = { .d = _raylib_debug_cflags_web,  .count = ARRLEN(_raylib_debug_cflags_web)  };
+const Nob_cstr_slice raylib_cflags_linux       = { .d = _raylib_cflags_linux,        .count = ARRLEN(_raylib_cflags_linux)        };
+const Nob_cstr_slice raylib_debug_cflags_linux = { .d = _raylib_debug_cflags_linux,  .count = ARRLEN(_raylib_debug_cflags_linux)  };
 
-const Slice(char_ptr) raylib_ldflags_mac = { .d = _raylib_ldflags_mac, .count = ARRLEN(_raylib_ldflags_mac) };
-const Slice(char_ptr) raylib_ldflags_linux = { .d = _raylib_ldflags_linux, .count = ARRLEN(_raylib_ldflags_linux) };
+const Nob_cstr_slice raylib_cflags_web       = { .d = _raylib_cflags_web,        .count = ARRLEN(_raylib_cflags_web)        };
+//Slice(cstr) raylib_debug_cflags_web = { .d = _raylib_debug_cflags_web,  .count = ARRLEN(_raylib_debug_cflags_web)  };
 
-const Slice(Str8) raylib_files = { .d = _raylib_files, .count = ARRLEN(_raylib_files) };
-const Slice(Str8) raylib_files_web = { .d = _raylib_files_web, .count = ARRLEN(_raylib_files_web) };
+const Nob_cstr_slice raylib_ldflags_mac = { .d = _raylib_ldflags_mac, .count = ARRLEN(_raylib_ldflags_mac) };
+const Nob_cstr_slice raylib_ldflags_linux = { .d = _raylib_ldflags_linux, .count = ARRLEN(_raylib_ldflags_linux) };
+
+const Nob_str8_slice raylib_files = { .d = _raylib_files, .count = ARRLEN(_raylib_files) };
+const Nob_str8_slice raylib_files_web = { .d = _raylib_files_web, .count = ARRLEN(_raylib_files_web) };
 
 #if defined(OS_WINDOWS)
 Str8 raylib_shared_lib_name = str8_lit("raylib.dll");
 #elif defined(OS_MAC)
 Str8 raylib_shared_lib_name = str8_lit("libraylib.dylib");
-Slice(char_ptr) raylib_cflags = raylib_cflags_mac;
-Slice(char_ptr) raylib_debug_cflags = raylib_debug_cflags_mac;
-Slice(char_ptr) raylib_ldflags = raylib_ldflags_mac;
+Nob_cstr_slice raylib_cflags = raylib_cflags_mac;
+Nob_cstr_slice raylib_debug_cflags = raylib_debug_cflags_mac;
+Nob_cstr_slice raylib_ldflags = raylib_ldflags_mac;
 #elif defined(OS_LINUX)
 Str8 raylib_shared_lib_name = str8_lit("libraylib.so");
-Slice(char_ptr) raylib_cflags = raylib_cflags_linux;
-Slice(char_ptr) raylib_debug_cflags = raylib_debug_cflags_linux;
-Slice(char_ptr) raylib_ldflags = raylib_ldflags_linux;
+Nob_cstr_slice raylib_cflags = raylib_cflags_linux;
+Nob_cstr_slice raylib_debug_cflags = raylib_debug_cflags_linux;
+Nob_cstr_slice raylib_ldflags = raylib_ldflags_linux;
 #else
 #error unsupported OS
 #endif
@@ -386,8 +391,8 @@ int build_raylib(void) {
     Raylib_build_kind kind;
     char *compiler;
     Str8 dir;
-    Slice_Str8 files;
-    Slice_char_ptr cflags;
+    Nob_str8_slice files;
+    Nob_cstr_slice cflags;
   } Raylib_build;
 
   Raylib_build raylib_builds[] = {
@@ -421,8 +426,8 @@ int build_raylib(void) {
 
     char *compiler = raylib_builds[build_i].compiler;
     Str8 build_dir = raylib_builds[build_i].dir;
-    Slice(Str8) files = raylib_builds[build_i].files;
-    Slice(char_ptr) cflags = raylib_builds[build_i].cflags;
+    Nob_str8_slice files = raylib_builds[build_i].files;
+    Nob_cstr_slice cflags = raylib_builds[build_i].cflags;
 
     for(int i = 0; i < files.count; i++) {
       Nob_Cmd cmd = {0};
@@ -801,7 +806,7 @@ int main(int argc, char **argv) {
   //if(!build_wasm()) return 1;
   //if(!build_itch()) return 1;
   //if(!build_hot_reload_no_cradle()) return 1;
-  if(!build_hot_reload()) return 1;
+  //if(!build_hot_reload()) return 1;
   //if(!build_hot_reload_cradle()) return 1;
 
 #if 1

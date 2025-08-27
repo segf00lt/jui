@@ -29,3 +29,5 @@ third_party/clay/
 screenshot*.png
 sounds/*.mp3
 *.webm
+test
+test_lexer_results

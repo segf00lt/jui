@@ -40,8 +40,8 @@ struct __Slice_header {
 #define ARRAY_DEFAULT_CAP 64
 
 
-#define Arr(T)   Arr_##T
-#define Slice(T) Slice_##T
+#define Arr(T)   struct { T *d; s64 count; s64 cap; Arena *arena; }
+#define Slice(T) struct { T *d; s64 count; }
 
 #define header_from_arr(arr)         (*(__Arr_header*)(void*)(&(arr)))
 #define header_from_arr_ptr(arr)     (*(__Arr_header*)(void*)(arr))

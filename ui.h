@@ -548,7 +548,7 @@ UI_signal ui_signal_from_box(UI_box *box);
 
 Str8 ui_strip_id_from_text(Str8 text);
 
-Vector2 ui_drag_delta(UI_state *ui);
+Vector2 ui_drag_delta(void);
 
 UI_box* ui_make_box_from_key(UI_box_flags flags, UI_key key);
 UI_box* ui_make_box_from_str(UI_box_flags flags, Str8 str);

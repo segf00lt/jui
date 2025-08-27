@@ -176,12 +176,105 @@ func s64 str8_find(Str8 haystack, Str8 needle) {
     found = i;
     goto end;
 
-continue_outer:;
+continue_outer:
+    ;
   }
 
-end:;
+end:
 
   return found;
+}
+
+func s64 str8_find_char(Str8 haystack, u8 needle) {
+  s64 found = -1;
+
+  for(s64 i = 0; i < haystack.len; i++) {
+    if(haystack.s[i] != needle) {
+      continue;
+    }
+
+    found = i;
+    break;
+  }
+
+  return found;
+}
+
+func Str8_find_results str8_find_all_chars(Str8 haystack, u8 needle, Arena *a) {
+  Str8_find_results results = {0};
+
+  Arena_scope scratch = scratch_begin(0, 0);
+
+  Arr(s64) begin_indexes;
+  Arr(s64) end_indexes;
+  arr_init_ex(begin_indexes, scratch.arena, 64);
+  arr_init_ex(end_indexes, scratch.arena, 64);
+
+  for(s64 i = 0; i < haystack.len; i++) {
+    if(haystack.s[i] != needle) {
+      continue;
+    }
+
+    arr_push(begin_indexes, i);
+    arr_push(end_indexes, i);
+  }
+
+  if(begin_indexes.count > 0) {
+    ASSERT(end_indexes.count > 0);
+
+    results.begin_indexes = push_array_no_zero(a, s64, begin_indexes.count);
+    memory_copy(results.begin_indexes, begin_indexes.d, begin_indexes.count * arr_stride(begin_indexes));
+
+    results.end_indexes = push_array_no_zero(a, s64, end_indexes.count);
+    memory_copy(results.end_indexes, end_indexes.d, end_indexes.count * arr_stride(end_indexes));
+
+    results.count = begin_indexes.count;
+  }
+
+  scratch_end(scratch);
+
+  return results;
+}
+
+func Str8_find_results str8_find_all(Str8 haystack, Str8 needle, Arena *a) {
+  Str8_find_results results = {0};
+
+  Arena_scope scratch = scratch_begin(0, 0);
+
+  Arr(s64) begin_indexes;
+  Arr(s64) end_indexes;
+  arr_init_ex(begin_indexes, scratch.arena, 64);
+  arr_init_ex(end_indexes, scratch.arena, 64);
+
+  for(s64 i = 0; i < haystack.len - needle.len; i++) {
+    for(s64 j = 0; j < needle.len; j++) {
+      if(haystack.s[i+j] != needle.s[j]) {
+        goto continue_outer;
+      }
+    }
+
+    arr_push(begin_indexes, i);
+    arr_push(end_indexes, i + needle.len);
+
+continue_outer:
+    ;
+  }
+
+  if(begin_indexes.count > 0) {
+    ASSERT(end_indexes.count > 0);
+
+    results.begin_indexes = push_array_no_zero(a, s64, begin_indexes.count);
+    memory_copy(results.begin_indexes, begin_indexes.d, begin_indexes.count * arr_stride(begin_indexes));
+
+    results.end_indexes = push_array_no_zero(a, s64, end_indexes.count);
+    memory_copy(results.end_indexes, end_indexes.d, end_indexes.count * arr_stride(end_indexes));
+
+    results.count = begin_indexes.count;
+  }
+
+  scratch_end(scratch);
+
+  return results;
 }
 
 func b32 str8_starts_with(Str8 str, Str8 start) {

@@ -21,6 +21,13 @@ struct Str8_list {
   s64 total_len;
 };
 
+typedef struct Str8_find_results Str8_find_results;
+struct Str8_find_results {
+  s64 *begin_indexes;
+  s64 *end_indexes;
+  s64 count;
+};
+
 #define str8_lit(strlit) ((Str8){ .s = (u8*)(strlit), .len = sizeof(strlit) - 1 })
 
 #define str8_match_lit(a_lit, b) str8_match(str8_lit(a_lit), b)
@@ -29,6 +36,10 @@ b32 str8_starts_with(Str8 str, Str8 start);
 b32 str8_ends_with(Str8 str, Str8 end);
 b32 str8_contains(Str8 str, Str8 substr);
 s64 str8_find(Str8 haystack, Str8 needle);
+s64 str8_find_char(Str8 haystack, u8 needle);
+
+Str8_find_results str8_find_all_chars(Str8 haystack, u8 needle, Arena *a);
+Str8_find_results str8_find_all(Str8 haystack, Str8 needle, Arena *a);
 
 Str8 str8_cat(Arena *a, Str8 str1, Str8 str2);
 

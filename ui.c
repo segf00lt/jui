@@ -256,7 +256,7 @@ func UI_box* ui_make_box_from_strf(UI_box_flags flags, char *fmt, ...) {
   return box;
 }
 
-func Vector2 ui_drag_delta(UI_state *ui) {
+func Vector2 ui_drag_delta(void) {
   return Vector2Subtract(ui_state->mouse_pos, ui_state->drag_start_pos);
 }
 
@@ -1217,7 +1217,7 @@ func void ui_draw(void) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 0
+#if 1
     arena_scope(ui_state->temp) {
 
 

@@ -567,14 +567,14 @@ func void game_update_and_draw(Game *gp) {
       }
 #endif
 
-#if 0
+#if 1
     Color background_color = { 83, 82, 99, 255 };
     Color border_color = { 53, 52, 69, 255 };
     Color text_color = ColorBrightness(RAYWHITE, 0.7f);
 
     Color window_background_color = ColorBrightness(BLUE, -0.4f);
 
-#if 0
+#if 1
     ui_background_color(background_color) ui_text_color(text_color) ui_border_color(border_color)
       ui_padding(6.0f)
       ui_border_size(4.0f) ui_corner_radius(0.5f)
@@ -582,12 +582,12 @@ func void game_update_and_draw(Game *gp) {
       ui_fixed_position(((Vector2){ 200, 200 }))
       ui_font_size(30.0f) ui_font_spacing(3.0f)
       ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 1.0f, .strictness = 1.0f }))
-      ui_button(ui, str8_lit("test button"));
+      ui_button(str8_lit("test button"));
 #endif
 
 #endif
 
-#if 0
+#if 1
 
     if(gp->dragging_item) {
       ui_permission_flags_top() |=
@@ -620,7 +620,7 @@ func void game_update_and_draw(Game *gp) {
         {
           UI_size space = ui_pixels(4, 1);
 
-          defer_loop(ui_inset_begin(ui, space, space, space, space), ui_inset_end(ui))
+          defer_loop(ui_inset_begin(space, space, space, space), ui_inset_end())
           {
             for(Item_node *item = list->first, *next = 0; item; item = next) {
               next = item->next;
@@ -637,12 +637,12 @@ func void game_update_and_draw(Game *gp) {
                 item_sig = item_button(gp, item);
 
               if(next) {
-                ui_spacer(ui, ui_pixels(6, 1));
+                ui_spacer(ui_pixels(6, 1));
               }
 
               UI_box *item_box = item_sig.box;
 
-              if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG && Vector2LengthSqr(ui_drag_delta(ui)) > 0) {
+              if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG && Vector2LengthSqr(ui_drag_delta()) > 0) {
                 gp->dragging_item = item;
                 gp->dragging_item_pos.x = item_box->final_rect_min[0];
                 gp->dragging_item_pos.y = item_box->final_rect_min[1];
@@ -700,10 +700,10 @@ func void game_update_and_draw(Game *gp) {
 
       UI_box *container;
       ui_flags(0)
-      ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta(ui)))
+      ui_fixed_position(Vector2Add(gp->dragging_item_pos, ui_drag_delta()))
       ui_fixed_width(gp->draggin_item_size[0])
       ui_fixed_height(gp->draggin_item_size[1])
-      container = ui_make_box_from_str(ui, UI_BOX_FLAG_FLOATING, str8_lit("##dragged_item_container"));
+      container = ui_make_box_from_str(UI_BOX_FLAG_FLOATING, str8_lit("##dragged_item_container"));
 
       container->debug_id = 0xFEFEFE;
 
@@ -728,7 +728,7 @@ func void game_update_and_draw(Game *gp) {
 #else
           for(Item_node *node = list->first; node; node = node->next) {
 
-            if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key(ui))) {
+            if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key())) {
               Item_node *dropped_item = gp->dragging_item;
 
               /* NOTE(~jfd 29/07/25)
