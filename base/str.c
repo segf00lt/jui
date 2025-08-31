@@ -340,7 +340,7 @@ func Str8 str8_copy(Arena *a, Str8 str) {
   u8 *s = push_array_no_zero(a, u8, str.len + 1);
   memory_copy(s, str.s, str.len);
   s[str.len] = 0;
-  return (Str8){ .s = s, .len = str.len };
+  return (Str8) { .s = s, .len = str.len };
 }
 
 func force_inline Str8 str8_copy_cstr(Arena *a, char *cstr) {
@@ -486,7 +486,7 @@ func force_inline Str8_list str8_split_by_char(Arena *a, Str8 str, u8 sep_char) 
   return str8_split_by_chars(a, str, &sep_char, 1);
 }
 
-func Str8_list str8_split_by_string(Arena *a, Str8 str, Str8 sep) {
+func Str8_list str8_split_by_str(Arena *a, Str8 str, Str8 sep) {
   Str8_list result = {0};
   Str8_node head = {0};
   Str8_node *node = &head;
@@ -545,4 +545,189 @@ func Str8_list str8_split_by_string(Arena *a, Str8 str, Str8 sep) {
   return result;
 }
 
+func Str8 str8_cstr_capped(void *cstr, void *cap) {
+  char *ptr = (char *)cstr;
+  char *opl = (char *)cap;
+  for(;ptr < opl && *ptr != 0; ptr += 1);
+  u64 size = (u64)(ptr - (char *)cstr);
+  Str8 result = (Str8){ (u8*)cstr, size };
+  return result;
+}
 
+func void str8_serial_begin(Arena *arena, Str8_list *srl) {
+  Str8_node *node = push_array(arena, Str8_node, 1);
+  node->str.s = push_array_no_zero(arena, u8, 0);
+  srl->first = srl->last = node;
+  srl->count = 1;
+  srl->total_len = 0;
+}
+
+func Str8 str8_serial_end(Arena *arena, Str8_list *srl) {
+  u64 len = srl->total_len;
+  u8 *out = push_array_no_zero(arena, u8, len);
+  str8_serial_write_to_dst(srl, out);
+  Str8 result = { out, len };
+  return result;
+}
+
+func void str8_serial_write_to_dst(Str8_list *srl, void *out) {
+  u8 *ptr = (u8*)out;
+  for(Str8_node *node = srl->first; node != 0; node = node->next) {
+    u64 len = node->str.len;
+    memory_copy(ptr, node->str.s, len);
+    ptr += len;
+  }
+}
+
+func u64 str8_serial_push_align(Arena *arena, Str8_list *srl, u64 align) {
+  ASSERT(IS_POW_2(align));
+  
+  u64 pos = srl->total_len;
+  u64 new_pos = ALIGN_UP(pos, align);
+  u64 len = (new_pos - pos);
+  
+  if(len != 0) {
+    u8 *buf = push_array(arena, u8, len);
+    
+    Str8 *str = &srl->last->str;
+    if(str->s + str->len == buf) {
+      srl->last->str.len += len;
+      srl->total_len += len;
+    } else {
+      str8_list_append_str_(arena, srl, (Str8){ buf, len });
+    }
+  }
+  return len;
+}
+
+func void* str8_serial_push_len(Arena *arena, Str8_list *srl, u64 len) {
+  void *result = 0;
+  if(len != 0) {
+    u8 *buf = push_array_no_zero(arena, u8, len);
+    Str8 *str = &srl->last->str;
+    if(str->s + str->len == buf) {
+      srl->last->str.len += len;
+      srl->total_len += len;
+    } else {
+      str8_list_append_str_(arena, srl, (Str8){ buf, len });
+    }
+    result = buf;
+  }
+  return result;
+}
+
+func void* str8_serial_push_data(Arena *arena, Str8_list *srl, void *data, u64 len) {
+  void *result = str8_serial_push_len(arena, srl, len);
+  if(result != 0) {
+    memory_copy(result, data, len);
+  }
+  return result;
+}
+
+func void str8_serial_push_data_list(Arena *arena, Str8_list *srl, Str8_node *first) {
+  for(Str8_node *node = first; node != 0; node = node->next) {
+    str8_serial_push_data(arena, srl, node->str.s, node->str.len);
+  }
+}
+
+func void str8_serial_push_u64(Arena *arena, Str8_list *srl, u64 x) {
+  u8 *buf = push_array_no_zero(arena, u8, 8);
+  memory_copy(buf, &x, 8);
+  Str8 *str = &srl->last->str;
+  if(str->s + str->len == buf) {
+    srl->last->str.len += 8;
+    srl->total_len += 8;
+  } else {
+    str8_list_append_str_(arena, srl, (Str8){ buf, 8 });
+  }
+}
+
+func void str8_serial_push_u32(Arena *arena, Str8_list *srl, u32 x) {
+  u8 *buf = push_array_no_zero(arena, u8, 4);
+  memory_copy(buf, &x, 4);
+  Str8 *str = &srl->last->str;
+  if(str->s + str->len == buf) {
+    srl->last->str.len += 4;
+    srl->total_len += 4;
+  } else {
+    str8_list_append_str_(arena, srl, (Str8){ buf, 4 });
+  }
+}
+
+func void str8_serial_push_u16(Arena *arena, Str8_list *srl, u16 x) {
+  str8_serial_push_data(arena, srl, &x, sizeof(x));
+}
+
+func void str8_serial_push_u8(Arena *arena, Str8_list *srl, u8 x) {
+  str8_serial_push_data(arena, srl, &x, sizeof(x));
+}
+
+func void str8_serial_push_cstr(Arena *arena, Str8_list *srl, Str8 str) {
+  str8_serial_push_data(arena, srl, str.s, str.len);
+  str8_serial_push_u8(arena, srl, 0);
+}
+
+func void str8_serial_push_str(Arena *arena, Str8_list *srl, Str8 str) {
+  str8_serial_push_data(arena, srl, str.s, str.len);
+}
+
+////////////////////////////////
+//~ rjf: Deserialization Helpers
+
+func u64 str8_deserial_read(Str8 str, u64 off, void *read_dst, u64 read_len, u64 granularity) {
+  u64 bytes_left = str.len-MIN(off, str.len);
+  u64 actually_readable_len = MIN(bytes_left, read_len);
+  u64 legally_readable_len = actually_readable_len - actually_readable_len%granularity;
+  if(legally_readable_len > 0) {
+    memory_copy(read_dst, str.s+off, legally_readable_len);
+  }
+  return legally_readable_len;
+}
+
+func u64 str8_deserial_find_first_match(Str8 str, u64 off, u16 scan_val) {
+  u64 cursor = off;
+  for(;;) {
+    u16 val = 0;
+    str8_deserial_read_struct(str, cursor, &val);
+    if(val == scan_val) {
+      break;
+    }
+    cursor += sizeof(val);
+  }
+  return cursor;
+}
+
+func void* str8_deserial_get_raw_ptr(Str8 str, u64 off, u64 len) {
+  void *raw_ptr = 0;
+  if(off + len <= str.len) {
+    raw_ptr = str.s + off;
+  }
+  return raw_ptr;
+}
+
+func u64 str8_deserial_read_cstr(Str8 str, u64 off, Str8 *cstr_out) {
+  u64 cstr_len = 0;
+  if(off < str.len) {
+    u8 *ptr = str.s + off;
+    u8 *cap = str.s + str.len;
+    *cstr_out = str8_cstr_capped(ptr, cap);
+    cstr_len = (cstr_out->len + 1);
+  }
+  return cstr_len;
+}
+
+func u64 str8_deserial_read_windows_utf16_str16(Str8 str, u64 off, Str16 *str_out) {
+  u64 null_off = str8_deserial_find_first_match(str, off, 0);
+  u64 len = null_off - off;
+  u16 *s = (u16 *)str8_deserial_get_raw_ptr(str, off, len);
+  u64 count = len / sizeof(*s);
+  *str_out = (Str16){ s, count };
+  
+  u64 read_len_with_null = len + sizeof(*s);
+  return read_len_with_null;
+}
+
+func u64 str8_deserial_read_block(Str8 str, u64 off, u64 len, Str8 *block_out) {
+  *block_out = str8_slice(str, off, off + len);
+  return block_out->len;
+}

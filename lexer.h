@@ -2,14 +2,18 @@
 #define _LEXER_H
 
 #define CTOKEN_KEYWORDS \
-  X(U8, "u8") \
+  X(U8,  "u8") \
   X(U16, "u16") \
   X(U32, "u32") \
   X(U64, "u64") \
-  X(S8, "s8") \
+  X(S8,  "s8") \
   X(S16, "s16") \
   X(S32, "s32") \
   X(S64, "s64") \
+  X(B8,  "b8") \
+  X(B16, "b16") \
+  X(B32, "b32") \
+  X(B64, "b64") \
   X(INT, "int") \
   X(LONG, "long") \
   X(UNSIGNED, "unsigned") \
@@ -18,6 +22,7 @@
   X(SHORT, "short") \
   X(FLOAT, "float") \
   X(DOUBLE, "double") \
+  X(BOOL, "bool") \
   X(VOID, "void") \
   X(FUNC, "func") \
   X(STRUCT, "struct") \
@@ -95,6 +100,10 @@ read_only Str8 ctoken_operators[CTOKEN_OPERATORS_END - CTOKEN_OPERATORS_BEGIN-1]
 
 read_only Str8 ctoken_chars = str8_lit("+=-)(*&^%$!~><.,?/:;'\"][{}\\|#");
 
+read_only Str8 ctoken_begin_comment_single_line = str8_lit("//");
+read_only Str8 ctoken_begin_comment_multi_line = str8_lit("/*");
+read_only Str8 ctoken_end_comment_multi_line = str8_lit("*/");
+
 typedef struct Ctoken Ctoken;
 struct Ctoken {
   Str8 str;
@@ -105,10 +114,21 @@ struct Ctoken {
   s32 comment_end_col;
 };
 
+typedef struct Clexer Clexer;
+struct Clexer {
+  Arena *arena;
+  Str8 src;
+  s64 pos;
+  s64 cur_col;
+  s64 cur_line;
+};
+
 DECL_ARR_TYPE_NAME(Ctoken, Ctoken_arr);
 DECL_SLICE_TYPE_NAME(Ctoken, Ctoken_slice);
 
 
-Ctoken_slice ctokenize(Arena *arena, Str8 src);
+Ctoken_slice lex_ctoken_old(Arena *arena, Str8 src);
+Ctoken_slice lex_ctoken_all(Arena *arena, Str8 src);
+Ctoken lex_ctoken(Clexer *lexer);
 
 #endif

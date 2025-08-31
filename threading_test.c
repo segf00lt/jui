@@ -3,7 +3,9 @@
 #include "lexer.h"
 #include "lexer.c"
 
-#include <pthread.h>
+#include "type_info.c"
+
+//#include <pthread.h>
 
 
 OS_handle thread_ids[2];
@@ -24,11 +26,6 @@ struct Foo {
   int a;
   float b;
   char c;
-};
-
-typedef struct Type_info Type_info;
-struct Type_info {
-  // TODO
 };
 
 int main(void) {
@@ -52,7 +49,7 @@ int main(void) {
 
   Str8 test_src = os_read_entire_file(scratch.arena, str8_lit("test_lexer.c"));
 
-  Ctoken_slice tokens = lex_ctoken(scratch.arena, test_src); 
+  Ctoken_slice tokens = lex_ctoken_all(scratch.arena, test_src); 
 
   printf("arena %p pos: %lu\n", scratch.arena, arena_pos(scratch.arena));
 

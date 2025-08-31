@@ -31,3 +31,4 @@ sounds/*.mp3
 *.webm
 test
 test_lexer_results
+test_output_old

@@ -7,6 +7,12 @@ struct Str8 {
   s64 len;
 };
 
+typedef struct Str16 Str16;
+struct Str16 {
+  u16 *s;
+  s64 len;
+};
+
 typedef struct Str8_node Str8_node;
 struct Str8_node {
   Str8 str;
@@ -69,6 +75,8 @@ Str8_list str8_split_by_string(Arena *a, Str8 str, Str8 sep);
 Str8_list str8_split_by_chars(Arena *a, Str8 str, u8 *sep_chars, s64 n_sep_chars);
 Str8_list str8_split_by_char(Arena *a, Str8 str, u8 sep_char);
 
+Str8 str8_cstr_capped(void *cstr, void *cap);
+
 Str8 str8_chop_last_slash(Str8 str);
 
 #define str8_list_append_node(list, node) str8_list_append_node_(&(list), node)
@@ -90,5 +98,32 @@ char* cstrf(Arena *a, char *fmt, ...);
 
 #define str8_list_insert_first_str(a, list, str) str8_list_insert_first_str_(a, &(list), str)
 void str8_list_insert_first_str_(Arena *a, Str8_list *list, Str8 str);
+
+void str8_serial_begin(Arena *arena, Str8_list *srl);
+Str8 str8_serial_end(Arena *arena, Str8_list *srl);
+void str8_serial_write_to_dst(Str8_list *srl, void *out);
+u64 str8_serial_push_align(Arena *arena, Str8_list *srl, u64 align);
+void* str8_serial_push_size(Arena *arena, Str8_list *srl, u64 size);
+void* str8_serial_push_data(Arena *arena, Str8_list *srl, void *data, u64 size);
+void str8_serial_push_data_list(Arena *arena, Str8_list *srl, Str8_node *first);
+void str8_serial_push_u64(Arena *arena, Str8_list *srl, u64 x);
+void str8_serial_push_u32(Arena *arena, Str8_list *srl, u32 x);
+void str8_serial_push_u16(Arena *arena, Str8_list *srl, u16 x);
+void str8_serial_push_u8(Arena *arena, Str8_list *srl, u8 x);
+void str8_serial_push_cstr(Arena *arena, Str8_list *srl, Str8 str);
+void str8_serial_push_str(Arena *arena, Str8_list *srl, Str8 str);
+
+#define str8_serial_push_array(arena, srl, ptr, count) str8_serial_push_data(arena, srl, ptr, sizeof(*(ptr)) * (count))
+#define str8_serial_push_struct(arena, srl, ptr) str8_serial_push_array(arena, srl, ptr, 1)
+
+u64 str8_deserial_read(Str8 str, u64 off, void *read_dst, u64 read_size, u64 granularity);
+u64 str8_deserial_find_first_match(Str8 str, u64 off, u16 scan_val);
+void* str8_deserial_get_raw_ptr(Str8 str, u64 off, u64 size);
+u64 str8_deserial_read_cstr(Str8 str, u64 off, Str8 *cstr_out);
+u64 str8_deserial_read_windows_utf16_str16(Str8 str, u64 off, Str16 *str_out);
+u64 str8_deserial_read_block(Str8 str, u64 off, u64 size, Str8 *block_out);
+
+#define str8_deserial_read_array(str, off, ptr, count) str8_deserial_read((str), (off), (ptr), sizeof(*(ptr))*(count), sizeof(*(ptr)))
+#define str8_deserial_read_struct(str, off, ptr)       str8_deserial_read_array(str, off, ptr, 1)
 
 #endif
