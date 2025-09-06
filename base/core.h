@@ -136,14 +136,16 @@
 # define C_LINKAGE
 #endif
 
+#ifndef alignof
 #if COMPILER_MSVC
-# define align_of(T) __alignof(T)
+# define alignof(T) __alignof(T)
 #elif COMPILER_CLANG
-# define align_of(T) __alignof(T)
+# define alignof(T) __alignof(T)
 #elif COMPILER_GCC
-# define align_of(T) __alignof__(T)
+# define alignof(T) __alignof__(T)
 #else
-# error align_of not defined for this compiler.
+# error alignof not defined for this compiler.
+#endif
 #endif
 
 #include <stdio.h>

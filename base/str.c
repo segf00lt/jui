@@ -359,7 +359,7 @@ func Str8 str8fv(Arena *a, char *fmt, va_list args) {
   va_copy(args2, args);
   u32 needed_bytes = str_vsnprintf(0, 0, fmt, args) + 1;
   Str8 result = {0};
-  result.s = (u8*)arena_push(a, sizeof(u8) * needed_bytes, align_of(u8));
+  result.s = (u8*)arena_push(a, sizeof(u8) * needed_bytes, alignof(u8));
   result.len = str_vsnprintf((char*)result.s, needed_bytes, fmt, args2);
   result.s[result.len] = 0;
   va_end(args2);

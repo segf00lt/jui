@@ -6,7 +6,7 @@ func Arena* arena_alloc_ex(u64 size, b32 cannot_chain, void *backing_buffer) {
   b32 has_backing_buffer = 0;
   void *base = backing_buffer;
 
-  size = ALIGN_UP(size, align_of(void*));
+  size = ALIGN_UP(size, alignof(void*));
 
   if(base) {
     cannot_chain = 1;

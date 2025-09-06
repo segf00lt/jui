@@ -11,6 +11,12 @@
 #include "ui_widgets.c"
 
 
+#if 0
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "third_party/stb/stb_truetype.h"
+#endif
+
+
 /*
  * constants
  */
@@ -106,6 +112,10 @@ struct Game {
   Item_node *dragging_item;
   Vector2 dragging_item_pos;
   f32 draggin_item_size[2];
+
+  Image test_bitmap;
+  Texture test_bitmap_texture;
+
 };
 
 
@@ -116,12 +126,14 @@ struct Game {
 Game* game_init(void);
 void game_load_assets(Game *gp);
 void game_unload_assets(Game *gp);
-void game_update_and_draw(Game *gp);
 void game_close(Game *gp);
 void game_reset(Game *gp);
-
 UI_signal item_button(Game *gp, Item_node *item);
+UI_signal begin_draggable_window(f32 x, f32 y, f32 w, f32 h, Str8 title);
+void end_draggable_window(void);
 UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height);
+void test_ui(Game *gp);
+void game_update_and_draw(Game *gp);
 
 /*
  * entity settings
@@ -204,6 +216,35 @@ func Game* game_init(void) {
 
 func void game_load_assets(Game *gp) {
 
+
+#if 0
+  {
+    stbtt_fontinfo font;
+    int w;
+    int h;
+    int i;
+    int j;
+    int c = 'a';
+    float s = 28.0;
+
+    Str8 ttf_file = os_read_entire_file(gp->main_arena, str8_lit("fonts/CourierPrime-Bold.ttf"));
+
+    stbtt_InitFont(&font, ttf_file.s, stbtt_GetFontOffsetForIndex(ttf_file.s,0));
+    u8 *test_bitmap = stbtt_GetCodepointBitmap(&font, 0,stbtt_ScaleForPixelHeight(&font, s), c, &w, &h, 0,0);
+    gp->test_bitmap =
+      (Image) {
+        .data = test_bitmap,
+        .width = w,
+        .height = h,
+        .mipmaps = 1,
+        .format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE,
+      };
+    gp->test_bitmap_texture = LoadTextureFromImage(gp->test_bitmap);
+    PASS;
+  }
+#endif
+
+
 }
 
 func void game_unload_assets(Game *gp) {
@@ -218,6 +259,68 @@ func void game_close(Game *gp) {
 
   CloseWindow();
   //CloseAudioDevice();
+}
+
+func void game_update_and_draw(Game *gp) {
+
+  if(IsKeyPressed(KEY_F5)) {
+    game_reset(gp);
+  }
+
+  gp->dt = Clamp(GetFrameTime(), MIN_FRAME_TIME, TARGET_FRAME_TIME);
+
+  if(WindowShouldClose()) {
+    gp->quit = 1;
+    return;
+  }
+
+  test_ui(gp);
+
+  defer_loop(BeginDrawing(), EndDrawing()) {
+    if(ui_state->took_input_event) {
+      ClearBackground(ColorBrightness(RED, -0.4));
+    } else {
+      ClearBackground(BLACK);
+    }
+
+    DrawTexture(gp->test_bitmap_texture, 300, 300, WHITE);
+
+    ui_draw();
+
+#if 1
+    { /* debug overlay */
+#define DEBUG_OVERLAY_TABLE \
+      /* string                                         fmt        expr */  \
+      X( frame time,                                    %.7f,      gp->dt) \
+      X( screen width,                                  %i,        GetScreenWidth()) \
+      X( screen height,                                 %i,        GetScreenHeight()) \
+      X( time to calc text and pixel sized boxes,       %f,        ui_prof_time_to_calc_absolute_sized_boxes) \
+      X( time to calc percent parent sized boxes,       %f,        ui_prof_time_to_calc_percent_sized_boxes) \
+      X( time to calc child sum sized boxes,            %f,        ui_prof_time_to_calc_sum_sized_boxes) \
+      X( time to do 1st pass,                           %f,        ui_prof_time_to_do_1st_pass) \
+      X( time to solve size violations,                 %f,        ui_prof_time_to_solve_size_violations) \
+      X( time to calc final positions,                  %f,        ui_prof_time_to_calc_positions) \
+      X( ui hot box key,                                %lu,       ui_state->hot_box_key.hash) \
+      // \
+
+
+      char *debug_text_fmt =
+#define X(string, fmt, expr) #string": "#fmt"\n"
+        DEBUG_OVERLAY_TABLE"%c";
+#undef X
+      Str8 debug_text = str8f(gp->frame_arena, debug_text_fmt,
+#define X(string, fmt, expr) (expr),
+          DEBUG_OVERLAY_TABLE 0);
+#undef X
+      Vector2 debug_text_size = MeasureTextEx(GetFontDefault(), (char*)debug_text.s, 20, 1.0);
+      DrawText((char*)debug_text.s, 10, GetScreenHeight() - debug_text_size.y + 20, 20, GREEN);
+    } /* debug overlay */
+#endif
+
+  }
+
+  arena_clear(gp->frame_arena);
+
 }
 
 func void game_reset(Game *gp) {
@@ -430,21 +533,8 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
   return inner_sig;
 }
 
-func void game_update_and_draw(Game *gp) {
-
-  if(IsKeyPressed(KEY_F5)) {
-    game_reset(gp);
-  }
-
-  gp->dt = Clamp(GetFrameTime(), MIN_FRAME_TIME, TARGET_FRAME_TIME);
-
+func void test_ui(Game *gp) {
   ui_state->scroll_rate = 10.0f;
-
-  if(WindowShouldClose()) {
-    gp->quit = 1;
-    return;
-  }
-
 
   ui_build() {
 
@@ -815,49 +905,6 @@ func void game_update_and_draw(Game *gp) {
 #endif
 
   }
-
-  defer_loop(BeginDrawing(), EndDrawing()) {
-    if(ui_state->took_input_event) {
-      ClearBackground(ColorBrightness(RED, -0.4));
-    } else {
-      ClearBackground(BLACK);
-    }
-
-    ui_draw();
-
-#if 1
-    { /* debug overlay */
-#define DEBUG_OVERLAY_TABLE \
-      /* string                                         fmt        expr */  \
-      X( frame time,                                    %.7f,      gp->dt) \
-      X( screen width,                                  %i,        GetScreenWidth()) \
-      X( screen height,                                 %i,        GetScreenHeight()) \
-      X( time to calc text and pixel sized boxes,       %f,        ui_prof_time_to_calc_absolute_sized_boxes) \
-      X( time to calc percent parent sized boxes,       %f,        ui_prof_time_to_calc_percent_sized_boxes) \
-      X( time to calc child sum sized boxes,            %f,        ui_prof_time_to_calc_sum_sized_boxes) \
-      X( time to do 1st pass,                           %f,        ui_prof_time_to_do_1st_pass) \
-      X( time to solve size violations,                 %f,        ui_prof_time_to_solve_size_violations) \
-      X( time to calc final positions,                  %f,        ui_prof_time_to_calc_positions) \
-      X( ui hot box key,                                %lu,       ui_state->hot_box_key.hash) \
-      // \
-
-
-      char *debug_text_fmt =
-#define X(string, fmt, expr) #string": "#fmt"\n"
-        DEBUG_OVERLAY_TABLE"%c";
-#undef X
-      Str8 debug_text = str8f(gp->frame_arena, debug_text_fmt,
-#define X(string, fmt, expr) (expr),
-          DEBUG_OVERLAY_TABLE 0);
-#undef X
-      Vector2 debug_text_size = MeasureTextEx(GetFontDefault(), (char*)debug_text.s, 20, 1.0);
-      DrawText((char*)debug_text.s, 10, GetScreenHeight() - debug_text_size.y + 20, 20, GREEN);
-    } /* debug overlay */
-#endif
-
-  }
-
-  arena_clear(gp->frame_arena);
 
 }
 

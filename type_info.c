@@ -51,6 +51,7 @@ struct Type_member {
 struct Type_info {
   Type_kind kind;
   Type_flags flags;
+  u64 align;
   u64 bytes;
   Type_info *child;
   Str8 count_delimiter_name;

@@ -6,7 +6,7 @@
 
 
 #define CC "clang"
-#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-unused-label", "-DDEBUG"
+#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-unused-label", "-Wno-unused-variable", "-DDEBUG"
 #define RELEASE_FLAGS "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi"
 #define WASM_FLAGS "-Os", "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-pthreads-mem-growth"
 #define TARGET "ui_test.c"
@@ -682,6 +682,9 @@ int run_tags(void) {
   nob_cmd_append(&cmd, CTAGS, "-w", "--sort=yes", "--langmap=c:.c.h", "--languages=c", "--c-kinds=+zpxm", "--extras=-q", "--fields=+n", "-a", RAYLIB_HEADERS);
   if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
 
+  nob_cmd_append(&cmd, CTAGS, "-w", "--sort=yes", "--langmap=c:.c.h", "--languages=c", "--c-kinds=+zfxm", "--extras=-q", "--fields=+n", "-a", "third_party/stb/stb_sprintf.h", "third_party/stb/stb_truetype.h");
+  if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
+
   //nob_cmd_append(&cmd, CTAGS, "-w", "--sort=yes", "--langmap=c:.c.h", "--languages=c", "--c-kinds=+zfxm", "--extras=-q", "--fields=+n", "-a", CLAY_HEADERS);
   //if(!nob_cmd_run_sync_and_reset(&cmd)) return 0;
 
@@ -805,11 +808,11 @@ int main(int argc, char **argv) {
   //if(!build_release()) return 1;
   //if(!build_wasm()) return 1;
   //if(!build_itch()) return 1;
-  //if(!build_hot_reload_no_cradle()) return 1;
+  if(!build_hot_reload_no_cradle()) return 1;
   //if(!build_hot_reload()) return 1;
   //if(!build_hot_reload_cradle()) return 1;
 
-#if 1
+#if 0
   {
     Nob_Cmd cmd = {0};
 

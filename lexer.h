@@ -14,6 +14,8 @@
   X(B16, "b16") \
   X(B32, "b32") \
   X(B64, "b64") \
+  X(F32, "f32") \
+  X(F64, "f64") \
   X(INT, "int") \
   X(LONG, "long") \
   X(UNSIGNED, "unsigned") \
@@ -114,8 +116,16 @@ struct Ctoken {
   s32 comment_end_col;
 };
 
+typedef u32 Clexer_flags;
+enum {
+  CLEXER_FLAG_SKIP_SINGLE_LINE_COMMENTS = (1<<0),
+  CLEXER_FLAG_SKIP_MULTI_LINE_COMMENTS = (1<<1),
+  CLEXER_FLAG_SKIP_COMMENTS = CLEXER_FLAG_SKIP_SINGLE_LINE_COMMENTS | CLEXER_FLAG_SKIP_MULTI_LINE_COMMENTS,
+};
+
 typedef struct Clexer Clexer;
 struct Clexer {
+  Clexer_flags flags;
   Arena *arena;
   Str8 src;
   s64 pos;
@@ -128,7 +138,7 @@ DECL_SLICE_TYPE_NAME(Ctoken, Ctoken_slice);
 
 
 Ctoken_slice lex_ctoken_old(Arena *arena, Str8 src);
-Ctoken_slice lex_ctoken_all(Arena *arena, Str8 src);
+Ctoken_slice lex_ctoken_all(Arena *arena, Str8 src, Clexer_flags flags);
 Ctoken lex_ctoken(Clexer *lexer);
 
 #endif
