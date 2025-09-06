@@ -43,7 +43,6 @@ typedef enum OS_linux_entity_kind {
   OS_LINUX_ENTITY_MUTEX,
   OS_LINUX_ENTITY_RWMUTEX,
   OS_LINUX_ENTITY_CONDITION_VARIABLE,
-  OS_LINUX_ENTITY_BARRIER,
 } OS_linux_entity_kind;
 
 typedef union OS_linux_entity_data OS_linux_entity_data;
@@ -52,7 +51,6 @@ union OS_linux_entity_data {
   pthread_mutex_t mutex;
   pthread_rwlock_t rwmutex;
   OS_linux_cond_var cv;
-  pthread_barrier_t barrier;
 };
 
 typedef struct OS_linux_entity OS_linux_entity;
@@ -116,12 +114,12 @@ b32 os_cond_var_wait_rw_r(OS_handle cv, OS_handle mutex_rw, u64 end_time_usec);
 b32 os_cond_var_wait_rw_w(OS_handle cv, OS_handle mutex_rw, u64 end_time_usec);
 void os_cond_var_signal(OS_handle cv);
 void os_cond_var_broadcast(OS_handle cv);
-OS_handle os_semaphore_alloc(u32 initial_count, u32 max_count, Str8 name);
-void  os_semaphore_release(OS_handle semaphore);
-OS_handle os_semaphore_open(Str8 name);
-void os_semaphore_close(OS_handle semaphore);
-b32 os_semaphore_take(OS_handle semaphore, u64 end_time_usec);
-void os_semaphore_drop(OS_handle semaphore);
+//OS_handle os_semaphore_alloc(u32 initial_count, u32 max_count, Str8 name);
+//void  os_semaphore_release(OS_handle semaphore);
+//OS_handle os_semaphore_open(Str8 name);
+//void os_semaphore_close(OS_handle semaphore);
+//b32 os_semaphore_take(OS_handle semaphore, u64 end_time_usec);
+//void os_semaphore_drop(OS_handle semaphore);
 OS_handle os_library_open(Str8 path);
 void os_library_close(OS_handle lib);
 Void_func* os_library_load_proc(OS_handle lib, Str8 name);
@@ -755,6 +753,7 @@ func void os_cond_var_broadcast(OS_handle cv) {
 }
 
 
+#if 0
 func OS_handle os_semaphore_alloc(u32 initial_count, u32 max_count, Str8 name) {
   OS_handle result = {0};
 
@@ -829,6 +828,7 @@ func void os_semaphore_drop(OS_handle semaphore) {
     break;
   }
 }
+#endif
 
 
 func OS_handle os_library_open(Str8 path) {

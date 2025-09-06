@@ -6,7 +6,7 @@
 
 
 #define CC "clang"
-#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-unused-label", "-Wno-unused-variable", "-DDEBUG"
+#define DEV_FLAGS "-std=c99", "-g", "-O0", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-unused-label", "-Wno-unused-variable", "-DDEBUG"
 #define RELEASE_FLAGS "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi"
 #define WASM_FLAGS "-Os", "-O2", "-Wall", "-Wpedantic", "-Werror", "-Wno-switch", "-Wno-comment", "-Wno-format-pedantic", "-Wno-initializer-overrides", "-Wno-extra-semi", "-Wno-pthreads-mem-growth"
 #define TARGET "ui_test.c"
@@ -726,7 +726,7 @@ int bootstrap_project(void) {
   } /* gen vscode project stuff */
 
   if(!build_raylib()) return 0;
-  if(!build_metaprogram()) return 0;
+  //if(!build_metaprogram()) return 0;
   //if(!run_metaprogram()) return 0;
   if(!run_tags()) return 0;
   if(!build_hot_reload()) return 0;
@@ -812,7 +812,7 @@ int main(int argc, char **argv) {
   //if(!build_hot_reload()) return 1;
   //if(!build_hot_reload_cradle()) return 1;
 
-#if 0
+#if 1
   {
     Nob_Cmd cmd = {0};
 
