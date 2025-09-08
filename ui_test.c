@@ -33,8 +33,6 @@
 #define WINDOW_SIZE ((Vector2){ WINDOW_WIDTH, WINDOW_HEIGHT })
 #define WINDOW_RECT ((Rectangle){0, 0, WINDOW_WIDTH, WINDOW_HEIGHT})
 
-#define MAX_FILES 64
-
 
 /*
  * tables
@@ -104,12 +102,14 @@ struct Game {
   UI_state *ui_state;
 
   b32  loaded_files;
-  Str8 files[MAX_FILES];
+  Str8 files[64];
   s32  files_count;
   s32  current_file;
 
   Item_list item_lists[2];
   Item_node *dragging_item;
+  Item_node *item_to_remove;
+  Item_list *list_to_remove_from;
   Vector2 dragging_item_pos;
   f32 draggin_item_size[2];
 
@@ -261,6 +261,8 @@ func void game_close(Game *gp) {
   //CloseAudioDevice();
 }
 
+bool once = true;
+
 func void game_update_and_draw(Game *gp) {
 
   if(IsKeyPressed(KEY_F5)) {
@@ -282,6 +284,7 @@ func void game_update_and_draw(Game *gp) {
     } else {
       ClearBackground(BLACK);
     }
+    //ClearBackground(BLACK);
 
     DrawTexture(gp->test_bitmap_texture, 300, 300, WHITE);
 
@@ -317,6 +320,11 @@ func void game_update_and_draw(Game *gp) {
     } /* debug overlay */
 #endif
 
+  }
+
+  if(once) {
+    once = false;
+    dumped = 1;
   }
 
   arena_clear(gp->frame_arena);
@@ -692,6 +700,20 @@ func void test_ui(Game *gp) {
     }
 
 
+    if(gp->item_to_remove) {
+      Item_list *list = gp->list_to_remove_from;
+      Item_node *item = gp->item_to_remove;
+      gp->item_to_remove = 0;
+
+      UI_box *item_box = ui_get_box_from_str(item->text);
+      gp->dragging_item = item;
+      gp->dragging_item_pos.x = item_box->final_rect_min[0];
+      gp->dragging_item_pos.y = item_box->final_rect_min[1];
+      gp->draggin_item_size[0] = item_box->fixed_size[0];
+      gp->draggin_item_size[1] = item_box->fixed_size[1];
+      dll_remove(list->first, list->last, item);
+    }
+
     for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
       Item_list *list = &gp->item_lists[list_i];
 
@@ -733,12 +755,9 @@ func void test_ui(Game *gp) {
               UI_box *item_box = item_sig.box;
 
               if(item_sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG && Vector2LengthSqr(ui_drag_delta()) > 0) {
-                gp->dragging_item = item;
-                gp->dragging_item_pos.x = item_box->final_rect_min[0];
-                gp->dragging_item_pos.y = item_box->final_rect_min[1];
-                gp->draggin_item_size[0] = item_box->fixed_size[0];
-                gp->draggin_item_size[1] = item_box->fixed_size[1];
-                dll_remove(list->first, list->last, item);
+                gp->item_to_remove = item;
+                gp->list_to_remove_from = list;
+                dumped = 1;
               }
             }
           }

@@ -413,6 +413,30 @@ begin:
     }
   }
 
+  if(is_decimal(pos_str.s[0])) {
+    // TODO parse numerical literals
+
+    Str8 lit_str = {0};
+
+    lit_str = str8_match_begin_int(pos_str, 10);
+    if(lit_str.len > 0) {
+      Cliteral literal;
+      literal.integer = str8_parse_int_decimal(lit_str);
+      token =
+        (Ctoken) {
+          .kind = CTOKEN_INT_LITERAL,
+          .str = lit_str,
+          .line = lexer->cur_line,
+          .col = lexer->cur_col,
+          .literal = literal,
+        };
+      lexer->cur_col += lit_str.len;
+      lexer->pos += lit_str.len;
+      goto end;
+    }
+
+  }
+
   if(pos_str.s[0] == '_' || is_alpha(pos_str.s[0])) {
 
     int end_ident = 1;

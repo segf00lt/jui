@@ -80,7 +80,8 @@ typedef enum Ctoken_kind {
     CTOKEN_OPERATORS_END,
 
   CTOKEN_IDENT,
-  CTOKEN_NUMBER,
+  CTOKEN_INT_LITERAL,
+  CTOKEN_FLOAT_LITERAL,
   CTOKEN_STRING,
   CTOKEN_CHARACTER,
 
@@ -106,10 +107,17 @@ read_only Str8 ctoken_begin_comment_single_line = str8_lit("//");
 read_only Str8 ctoken_begin_comment_multi_line = str8_lit("/*");
 read_only Str8 ctoken_end_comment_multi_line = str8_lit("*/");
 
+typedef union Cliteral Cliteral;
+union Cliteral {
+  u64 integer;
+  f64 floating;
+};
+
 typedef struct Ctoken Ctoken;
 struct Ctoken {
   Str8 str;
   Ctoken_kind kind;
+  Cliteral literal;
   s32 line;
   s32 col;
   s32 comment_end_line;

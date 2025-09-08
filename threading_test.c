@@ -74,6 +74,9 @@ func Type_info* gen_type_info_from_struct(Arena *arena, Clexer *lexer) {
       *lexer = save_lexer;
     }
   }
+  token = lex_ctoken(lexer);
+
+  ASSERT(token.kind == ';');
 
   result->members = push_array(arena, Type_member, member_array.count);
   result->member_or_array_count = member_array.count;
@@ -196,11 +199,60 @@ func Type_member* gen_type_info_from_struct_member(Arena *arena, Clexer *lexer) 
         } break;
       case CTOKEN_UNSIGNED:
         {
-          UNIMPLEMENTED;
+          token = lex_ctoken(lexer);
+
+          switch(token.kind) {
+            case CTOKEN_INT:
+              first->kind = TYPE_KIND_U32;
+              first->bytes = sizeof(u32);
+              first->align = alignof(u32);
+              break;
+            case CTOKEN_CHAR:
+              first->kind = TYPE_KIND_U8;
+              first->bytes = sizeof(u8);
+              first->align = alignof(u8);
+              break;
+            case CTOKEN_SHORT:
+              first->kind = TYPE_KIND_U16;
+              first->bytes = sizeof(u16);
+              first->align = alignof(u16);
+              break;
+            case CTOKEN_LONG:
+              first->kind = TYPE_KIND_U64;
+              first->bytes = sizeof(u64);
+              first->align = alignof(u64);
+              break;
+          }
+
         } break;
       case CTOKEN_SIGNED:
         {
-          UNIMPLEMENTED;
+
+          token = lex_ctoken(lexer);
+
+          switch(token.kind) {
+            case CTOKEN_INT:
+              first->kind = TYPE_KIND_S32;
+              first->bytes = sizeof(s32);
+              first->align = alignof(s32);
+              break;
+            case CTOKEN_CHAR:
+              first->kind = TYPE_KIND_S8;
+              first->bytes = sizeof(s8);
+              first->align = alignof(s8);
+              break;
+            case CTOKEN_SHORT:
+              first->kind = TYPE_KIND_S16;
+              first->bytes = sizeof(s16);
+              first->align = alignof(s16);
+              break;
+            case CTOKEN_LONG:
+              first->kind = TYPE_KIND_S64;
+              first->bytes = sizeof(s64);
+              first->align = alignof(s64);
+              break;
+          }
+
         } break;
       case CTOKEN_VOID:
         {
@@ -243,12 +295,49 @@ func Type_member* gen_type_info_from_struct_member(Arena *arena, Clexer *lexer) 
 
     token = lex_ctoken(lexer);
 
-#if 0
-    Type_info array_chain_begin = {0};
-    Type_info *array = &array_chain_begin;
+    Type_info *array_chain_first = 0;
     if(token.kind == '[') {
+      array_chain_first = push_struct(arena, Type_info);
+      array_chain_first->kind = TYPE_KIND_ARRAY;
+      array_chain_first->bytes = member_type->bytes;
+      array_chain_first->align = member_type->align;
+
+      token = lex_ctoken(lexer);
+      ASSERT(token.kind == CTOKEN_INT_LITERAL); // TODO replace these asserts with proper error handling
+
+      array_chain_first->bytes *= token.literal.integer;
+      array_chain_first->member_or_array_count = token.literal.integer;
+
+      token = lex_ctoken(lexer);
+      ASSERT(token.kind == ']');
+
+      Type_info *array_chain_last = array_chain_first;
+      array_chain_last->child = member_type;
+
+      token = lex_ctoken(lexer);
+      while(token.kind == '[') {
+        Type_info *p = push_struct(arena, Type_info);
+        p->kind = TYPE_KIND_ARRAY;
+        p->bytes = array_chain_last->bytes;
+        p->align = array_chain_last->align;
+
+        token = lex_ctoken(lexer);
+        ASSERT(token.kind == CTOKEN_INT_LITERAL); // TODO replace these asserts with proper error handling
+
+        p->bytes *= token.literal.integer;
+        p->member_or_array_count = token.literal.integer;
+
+        token = lex_ctoken(lexer);
+        ASSERT(token.kind == ']');
+
+        sll_queue_push_front_n(array_chain_first, array_chain_last, p, child);
+        token = lex_ctoken(lexer);
+      }
+
     }
-#endif
+    if(array_chain_first) {
+      member_type = array_chain_first;
+    }
 
     ASSERT(token.kind == ';');
 
@@ -313,12 +402,28 @@ int main(void) {
     }
 
     lexer.pos = lexer.cur_col = lexer.cur_line = 0;
-    Type_info *tinfo = gen_type_info_from_struct(scratch.arena, &lexer);
 
-    if(tinfo) {
-      printf("type name: %.*s\n", (int)tinfo->name.len, tinfo->name.s);
-      for(int i = 0; i < tinfo->member_or_array_count; i++) {
-        printf("member name: %.*s\nmember offset: %lu\n", (int)tinfo->members[i].name.len, tinfo->members[i].name.s, tinfo->members[i].offset);
+    {
+      Type_info *tinfo = gen_type_info_from_struct(scratch.arena, &lexer);
+
+      if(tinfo) {
+        printf("type name: %.*s\n", (int)tinfo->name.len, tinfo->name.s);
+        for(int i = 0; i < tinfo->member_or_array_count; i++) {
+          printf("member name: %.*s\nmember offset: %lu\n", (int)tinfo->members[i].name.len, tinfo->members[i].name.s, tinfo->members[i].offset);
+        }
+      }
+    }
+
+    printf("/////////////\n");
+
+    {
+      Type_info *tinfo = gen_type_info_from_struct(scratch.arena, &lexer);
+
+      if(tinfo) {
+        printf("type name: %.*s\n", (int)tinfo->name.len, tinfo->name.s);
+        for(int i = 0; i < tinfo->member_or_array_count; i++) {
+          printf("member name: %.*s\nmember offset: %lu\n", (int)tinfo->members[i].name.len, tinfo->members[i].name.s, tinfo->members[i].offset);
+        }
       }
     }
 

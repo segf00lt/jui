@@ -166,12 +166,15 @@ func UI_box* ui_make_box_from_key(UI_box_flags flags, UI_key key) {
     memory_zero(box, sizeof(UI_box));
 
     box->debug_id = ui_state->debug_id_counter++;
+  } else {
+    ASSERT_MESSAGE(box->last_visited_build_index != ui_state->build_index, "box with hash %lu and debug id %lu is being created more than once", box->key.hash, box->debug_id);
   }
 
   {
     box->first = box->last = box->next = box->prev = box->parent = 0;
     box->child_count = 0;
     box->flags = 0;
+    box->was_drawn_this_frame = 0;
     memory_zero(box->semantic_size, sizeof(box->semantic_size));
   }
 
@@ -1080,17 +1083,25 @@ func void dump_UI_box(const UI_box *box) {
     printf("}\n");
 }
 
-//int dumped = 2;
+int dumped = 0;
 
 func void ui_draw(void) {
   
-  //if(dumped > 0) {
-  //  printf("====== BEGIN DRAW DUMP ======\n");
-  //}
-  //
-  //int depth = 0;
+#ifdef UI_DRAW_DUMP
+  if(dumped > 0) {
+    printf("====== BEGIN DRAW DUMP ======\n");
+  }
+  
+  int depth = 0;
+#endif
 
   for(UI_box *box = ui_state->root; box;) {
+
+    if(box->was_drawn_this_frame) {
+      PANICF("box with hash %lu and debug id %lu is being drawn more than once", box->key.hash, box->debug_id);
+    } else {
+      box->was_drawn_this_frame = 1;
+    }
 
     //TraceLog(LOG_DEBUG, "drawing %s", cstrf(ui_state->temp, "'%S' %li", box->key.src_str, box->key.hash));
 
@@ -1217,30 +1228,28 @@ func void ui_draw(void) {
       BeginScissorMode((int)rec.x, (int)rec.y, (int)rec.width, (int)rec.height);
     }
 
-#if 1
+#ifdef UI_DRAW_DUMP
     arena_scope(ui_state->temp) {
 
-
-#if 0
       SetTextLineSpacing(1);
       {
         Str8 dump = 
             str8f(ui_state->temp,
-              "%*sx = %f\ty = %f\n\n"
-              "%*swidth = %f\theight = %f\n\n"
-              "%*shash = %li\t\t\tsrc_str = %S\n"
+              "%*sx = %f    y = %f\n\n"
+              "%*swidth = %f    height = %f\n\n"
+              "%*shash = %li    src_str = %S\n"
               "%*sdebug id = %lu%"
               ,
-              depth, "\t",
+              4*depth, " ",
               box->final_rect_min[0],
               box->final_rect_min[1],
-              depth, "\t",
+              4*depth, " ",
               box->final_rect_max[0] - box->final_rect_min[0],
               box->final_rect_max[1] - box->final_rect_min[1],
-              depth, "\t",
+              4*depth, " ",
               box->key.hash,
               box->key.src_str,
-              depth, "\t",
+              4*depth, " ",
               box->debug_id
               );
 
@@ -1253,15 +1262,19 @@ func void ui_draw(void) {
         //    (char*)dump.s,
         //    pos, 10, 1.0, GREEN);
       }
-#endif
 
       SetTextLineSpacing(5);
-      DrawRectangleLinesEx(rec, 1.0, RED);
+      //DrawRectangleLinesEx(rec, 1.0, RED);
+
     }
 #endif
 
     if(box->first) {
-      //depth++;
+
+#ifdef UI_DRAW_DUMP
+      depth++;
+#endif
+
       box = box->first;
     } else {
 
@@ -1273,7 +1286,11 @@ func void ui_draw(void) {
         box = box->next;
       } else {
         while(box && !(box->next)) {
-          //depth--;
+
+#ifdef UI_DRAW_DUMP
+          depth--;
+#endif
+
           box = box->parent;
 
           if(box && box->flags & UI_BOX_FLAG_CLIP) {
@@ -1292,10 +1309,12 @@ func void ui_draw(void) {
 
   arena_clear(ui_state->draw_arena);
 
-  //if(dumped > 0) {
-  //  printf("====== END DRAW DUMP ======\n");
-  //  dumped--;
-  //}
+#ifdef UI_DRAW_DUMP
+  if(dumped > 0) {
+    printf("====== END DRAW DUMP ======\n");
+    dumped--;
+  }
+#endif
 
 }
 

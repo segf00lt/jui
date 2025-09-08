@@ -54,6 +54,16 @@ b32 str8_is_alpha(Str8 str);
 b32 str8_is_numeric(Str8 str, int base);
 b32 str8_is_decimal(Str8 str);
 
+Str8 str8_match_begin_int(Str8 str, int base);
+Str8 str8_match_begin_float(Str8 str);
+
+u64 str8_parse_int(Str8 str, int base);
+u64 str8_parse_int_decimal(Str8 str);
+u64 str8_parse_int_binary(Str8 str);
+u64 str8_parse_int_hex(Str8 str);
+
+f64 str8_parse_float(Str8 str);
+
 Str8 str8_to_upper(Arena *a, Str8 str);
 Str8 str8_to_lower(Arena *a, Str8 str);
 
@@ -66,6 +76,8 @@ Str8 str8_slice(Str8 str, s64 begin, s64 end);
 #define to_upper(c) (is_lower(c) ? ((c) - 'a' + 'A') : (c))
 #define is_alpha(c) ('a' <= to_lower(c) && to_lower(c) <= 'z')
 #define is_decimal(c) (!!('0' <= (c) && (c) <= '9'))
+#define is_hex(c) (!!(is_decimal(c) || ('a' <= to_lower(c) && to_lower(c) <= 'f') ))
+#define is_binary(c) (!!((c) == '1' || (c) == '0'))
 #define letter_index(c) ((s64)(to_lower(c) - 'a'))
 #define hexdigit_to_int(c) ((s64)(is_alpha(c) ? (to_lower(c) - 'a' + 0xa) : (c - '0')))
 

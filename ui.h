@@ -413,6 +413,7 @@ struct UI_box {
 
   UI_key key;
   u64 debug_id;
+  b64 was_drawn_this_frame;
 
   UI_box *hash_next;
   UI_box *hash_prev;

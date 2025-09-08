@@ -336,6 +336,86 @@ func b32 str8_is_decimal(Str8 str) {
   return result;
 }
 
+func Str8 str8_match_begin_int(Str8 str, int base) {
+  Str8 result = {0};
+  s64 i = 0;
+
+  switch(base) {
+    default:
+      break;
+    case 10:
+      {
+        for(; i < str.len && is_decimal(str.s[i]); i++);
+      } break;
+    case 2:
+      {
+        for(; i < str.len && is_binary(str.s[i]); i++);
+      } break;
+    case 16:
+      {
+        for(; i < str.len && is_hex(str.s[i]); i++);
+      } break;
+  }
+
+  if(i > 0) {
+    result.s = str.s;
+    result.len = i;
+  }
+
+  return result;
+}
+
+func u64 str8_parse_int(Str8 str, int base) {
+  u64 result;
+  switch(base) {
+    default:
+      result = 0;
+      break;
+    case 10:
+      result = str8_parse_int_decimal(str);
+      break;
+    case 2:
+      result = str8_parse_int_binary(str);
+      break;
+    case 16:
+      result = str8_parse_int_hex(str);
+      break;
+  }
+  return result;
+}
+
+func u64 str8_parse_int_decimal(Str8 str) {
+  u64 result = 0;
+
+  for(int i = 0; i < str.len; i++) {
+    result *= 10;
+    result += str.s[i] - '0';
+  }
+
+  return result;
+}
+
+func u64 str8_parse_int_binary(Str8 str) {
+  UNIMPLEMENTED;
+}
+
+func u64 str8_parse_int_hex(Str8 str) {
+  UNIMPLEMENTED;
+}
+
+
+func Str8 str8_match_begin_float(Str8 str) {
+  Str8 result = {0};
+  UNIMPLEMENTED;
+  return result;
+}
+
+func f64 str8_parse_float(Str8 str) {
+  f64 result = 0.0f;
+  UNIMPLEMENTED;
+  return result;
+}
+
 func Str8 str8_copy(Arena *a, Str8 str) {
   u8 *s = push_array_no_zero(a, u8, str.len + 1);
   memory_copy(s, str.s, str.len);
