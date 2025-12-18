@@ -361,7 +361,6 @@ int main(void) {
 
   //printf("hello %p\n", os_state);
 
-
   //for(int i = 0; i < 2; i++) {
   //  thread_ids[i]  = os_thread_launch((OS_thread_func*)&do_a_thing, 0, 0);
   //  printf("thread succesfully created\n");
@@ -380,7 +379,7 @@ int main(void) {
       .src = test_src,
     };
 
-    Ctoken_slice tokens = lex_ctoken_all(scratch.arena, test_src, 0); 
+    Ctoken_slice tokens = lex_ctoken_all(scratch.arena, test_src, 0);
 
     printf("arena %p pos: %lu\n", scratch.arena, arena_pos(scratch.arena));
 

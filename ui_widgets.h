@@ -3,11 +3,6 @@
 
 void ui_divider(UI_size size);
 
-UI_box* ui_row_begin(void);
-UI_box* ui_named_row_begin(Str8 str);
-UI_signal ui_row_end(void);
-UI_signal ui_named_row_end(void);
-UI_box* ui_inset_begin(UI_size left, UI_size right, UI_size top, UI_size bottom);
 UI_box* ui_named_inset_begin(UI_size left, UI_size right, UI_size top, UI_size bottom, Str8 str);
 UI_signal ui_inset_end(void);
 UI_signal ui_named_inset_end(void);
@@ -21,6 +16,12 @@ UI_box* ui_column_begin(void);
 UI_box* ui_named_column_begin(Str8 str);
 UI_signal ui_column_end(void);
 UI_signal ui_named_column_end(void);
+
+UI_box* ui_row_begin(void);
+UI_box* ui_named_row_begin(Str8 str);
+UI_signal ui_row_end(void);
+UI_signal ui_named_row_end(void);
+UI_box* ui_inset_begin(UI_size left, UI_size right, UI_size top, UI_size bottom);
 
 UI_box* ui_pane_begin(f32 x, f32 y, f32 w, f32 h, Str8 str);
 

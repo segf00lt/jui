@@ -7,6 +7,8 @@
 #include "ui.h"
 #include "ui_widgets.h"
 
+// #define UI_DRAW_DUMP
+
 #include "ui.c"
 #include "ui_widgets.c"
 
@@ -113,6 +115,8 @@ struct Game {
   Vector2 dragging_item_pos;
   f32 draggin_item_size[2];
 
+  // Vector2 draggable_window_pos;
+
   Image test_bitmap;
   Texture test_bitmap_texture;
 
@@ -156,9 +160,17 @@ Vector2 window_pos2 =
   .x = 400,
   .y = 40,
 };
-Vector2 save_window_pos2;
 
-/* 
+Vector2 draggable_window_pos =
+{
+  .x = 500,
+  .y = 100,
+};
+
+Vector2 save_window_pos2;
+Vector2 save_draggable_window_pos;
+
+/*
  * function bodies
  */
 
@@ -217,7 +229,7 @@ func Game* game_init(void) {
 func void game_load_assets(Game *gp) {
 
 
-#if 0
+  #if 0
   {
     stbtt_fontinfo font;
     int w;
@@ -232,17 +244,17 @@ func void game_load_assets(Game *gp) {
     stbtt_InitFont(&font, ttf_file.s, stbtt_GetFontOffsetForIndex(ttf_file.s,0));
     u8 *test_bitmap = stbtt_GetCodepointBitmap(&font, 0,stbtt_ScaleForPixelHeight(&font, s), c, &w, &h, 0,0);
     gp->test_bitmap =
-      (Image) {
-        .data = test_bitmap,
-        .width = w,
-        .height = h,
-        .mipmaps = 1,
-        .format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE,
-      };
+    (Image) {
+      .data = test_bitmap,
+      .width = w,
+      .height = h,
+      .mipmaps = 1,
+      .format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE,
+    };
     gp->test_bitmap_texture = LoadTextureFromImage(gp->test_bitmap);
     PASS;
   }
-#endif
+  #endif
 
 
 }
@@ -290,9 +302,9 @@ func void game_update_and_draw(Game *gp) {
 
     ui_draw();
 
-#if 1
+    #if 1
     { /* debug overlay */
-#define DEBUG_OVERLAY_TABLE \
+      #define DEBUG_OVERLAY_TABLE \
       /* string                                         fmt        expr */  \
       X( frame time,                                    %.7f,      gp->dt) \
       X( screen width,                                  %i,        GetScreenWidth()) \
@@ -308,17 +320,17 @@ func void game_update_and_draw(Game *gp) {
 
 
       char *debug_text_fmt =
-#define X(string, fmt, expr) #string": "#fmt"\n"
-        DEBUG_OVERLAY_TABLE"%c";
-#undef X
+      #define X(string, fmt, expr) #string": "#fmt"\n"
+      DEBUG_OVERLAY_TABLE"%c";
+      #undef X
       Str8 debug_text = str8f(gp->frame_arena, debug_text_fmt,
-#define X(string, fmt, expr) (expr),
-          DEBUG_OVERLAY_TABLE 0);
-#undef X
+      #define X(string, fmt, expr) (expr),
+        DEBUG_OVERLAY_TABLE 0);
+      #undef X
       Vector2 debug_text_size = MeasureTextEx(GetFontDefault(), (char*)debug_text.s, 20, 1.0);
       DrawText((char*)debug_text.s, 10, GetScreenHeight() - debug_text_size.y + 20, 20, GREEN);
     } /* debug overlay */
-#endif
+    #endif
 
   }
 
@@ -379,16 +391,79 @@ func void game_reset(Game *gp) {
 }
 
 func UI_signal item_button(Game *gp, Item_node *item) {
-  UI_signal sig = {0}; 
+  UI_signal sig = {0};
 
   ui_text_align(UI_TEXT_ALIGN_CENTER)
-    ui_padding(4.0f)
-    ui_font_size(20.0f)
-    ui_font_spacing(2.0f)
+  ui_padding(4.0f)
+  ui_font_size(20.0f)
+  ui_font_spacing(2.0f)
 
-    sig = ui_button(item->text);
+  sig = ui_button(item->text);
 
   return sig;
+}
+
+func UI_signal begin_window(f32 x, f32 y, f32 w, f32 h, Str8 title) {
+
+  Vector2 pos = { x, y };
+
+  ui_fixed_position_set_next(pos);
+  ui_fixed_width_set_next(w);
+  ui_fixed_height_set_next(h);
+  UI_box *outer_box = ui_make_transient_box(
+    UI_BOX_FLAG_FLOATING |
+    UI_BOX_FLAG_DRAW_BORDER |
+    UI_BOX_FLAG_DRAW_BACKGROUND |
+    0
+  );
+
+  ui_prop_push(parent, outer_box);
+
+  UI_size title_width = ui_percent_of_parent(1.0f, 1.0f);
+  UI_size title_height = ui_text_content(1.0f);
+
+  ui_semantic_width_set_next(title_width);
+  ui_semantic_height_set_next(title_height);
+  UI_box *title_bar_box = ui_make_box_from_str(
+    UI_BOX_FLAG_DRAW_TEXT |
+    UI_BOX_FLAG_DRAW_BACKGROUND |
+    UI_BOX_FLAG_MOUSE_CLICKABLE |
+    UI_BOX_FLAG_DRAW_SIDE_BOTTOM |
+    0,
+    title
+  );
+
+  {
+    f32 border_size = ui_prop_top(border_size);
+    ui_spacer(ui_pixels(border_size, 1.0f));
+  }
+
+  UI_size inner_box_width = ui_children_sum(1.0f);
+  UI_size inner_box_height = ui_children_sum(1.0f);
+
+  UI_box *inner_box = ui_make_transient_box(0);
+
+  ui_prop_pop(parent);
+
+  ui_prop_push(parent, inner_box);
+
+  UI_signal title_bar_sig = ui_signal_from_box(title_bar_box);
+
+  Color title_bar_background_color = title_bar_box->background_color;
+
+  if(ui_key_match(ui_hot_box_key(), title_bar_box->key)) {
+    title_bar_box->background_color = ColorBrightness(title_bar_background_color, 0.12f);
+  }
+
+  if(ui_key_match(ui_active_box_key(UI_MOUSE_BUTTON_LEFT), title_bar_box->key)) {
+    title_bar_box->background_color = ColorBrightness(title_bar_background_color, -0.12f);
+  }
+
+  return title_bar_sig;
+}
+
+func void end_window(void) {
+  ui_prop_pop(parent);
 }
 
 func UI_signal begin_draggable_window(f32 x, f32 y, f32 w, f32 h, Str8 title) {
@@ -396,41 +471,58 @@ func UI_signal begin_draggable_window(f32 x, f32 y, f32 w, f32 h, Str8 title) {
   UI_box *inner_box = 0;
   UI_box *title_box = 0;
 
-  ui_child_layout_axis(UI_AXIS_Y) ui_fixed_position(((Vector2){ x, y })) ui_fixed_width(w) ui_fixed_height(h)
+  Vector2 pos = { x, y };
+  f32 title_corner_radius = 2;
+  f32 title_border_size = 1.6f;
+  ui_child_layout_axis(UI_AXIS_Y)
+  ui_fixed_position(pos)
+  ui_fixed_width(w)
+  ui_fixed_height(h)
+  ui_border_size(title_border_size)
+  ui_corner_radius(title_corner_radius)
+  // ui_corner_radius_0(title_corner_radius) ui_corner_radius_1(title_corner_radius)
 
-    outer_box = ui_make_box_from_str(
-        UI_BOX_FLAG_FLOATING |
-        //UI_BOX_FLAG_CLIP |
-        UI_BOX_FLAG_OVERFLOW_Y |
-        0,
-        str8_cat(ui_state->build_arena, title, str8_lit("##dummy_key12312"))); // NOTE when boxes don't have keys their sizes get cleared
+  // NOTE(~jfd 26/09/25) is seems the problem was actually with enabling the clipping flag
+  outer_box = ui_make_transient_box(
+    UI_BOX_FLAG_FLOATING |
+    UI_BOX_FLAG_OVERFLOW_Y |
+    UI_BOX_FLAG_DRAW_BORDER |
+    UI_BOX_FLAG_DRAW_BACKGROUND |
+    // UI_BOX_FLAG_CLIP |
+    0
+  );
 
   ui_parent(outer_box)
   {
 
-    UI_size title_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f };
-    UI_size title_height = { .kind = UI_SIZE_TEXT_CONTENT, .strictness = 1.0 };
+    UI_size title_width = ui_percent_of_parent(1.0f, 1.0f);
+    UI_size title_height = ui_text_content(1.0f);
 
     Color title_background = ColorBrightness(ui_prop_top(background_color), -0.3f);
 
     ui_background_color(title_background)
-    ui_corner_radius_0(0.4f) ui_corner_radius_1(0.4f)
+    ui_border_size(title_border_size)
+    // ui_corner_radius(0.4f)
+    ui_corner_radius_0(title_corner_radius) ui_corner_radius_1(title_corner_radius)
+    // ui_corner_radius_0(5) ui_corner_radius_1(5)
     ui_semantic_width(title_width) ui_semantic_height(title_height)
     ui_padding(8.0f)
 
-      title_box = ui_make_box_from_str(
-          UI_BOX_FLAG_DRAW_TEXT |
-          UI_BOX_FLAG_DRAW_BACKGROUND |
-          UI_BOX_FLAG_MOUSE_CLICKABLE |
-          0,
-          title);
+    title_box = ui_make_box_from_str(
+      UI_BOX_FLAG_DRAW_TEXT |
+      UI_BOX_FLAG_DRAW_BACKGROUND |
+      UI_BOX_FLAG_MOUSE_CLICKABLE |
+      UI_BOX_FLAG_DRAW_SIDE_BOTTOM |
+      0,
+      title);
+
+    ui_spacer(ui_pixels(title_border_size, 1.0f));
 
     UI_box *box;
-    ui_semantic_width(((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f }))
-      ui_semantic_height(((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f }))
-        ui_child_layout_axis(UI_AXIS_X)
-          box = ui_make_transient_box(
-              0);
+    ui_semantic_width(ui_percent_of_parent(1.0f, 1.0f))
+    ui_semantic_height(ui_children_sum(1.0f))
+    ui_child_layout_axis(UI_AXIS_X)
+    box = ui_make_transient_box(0);
 
     ui_parent(box)
     {
@@ -440,15 +532,10 @@ func UI_signal begin_draggable_window(f32 x, f32 y, f32 w, f32 h, Str8 title) {
       UI_size inner_box_height = ui_children_sum(1.0f);
 
       ui_semantic_width(inner_box_width) ui_semantic_height(inner_box_height)
-        ui_border_size(2.0f) ui_corner_radius(0.0f)
-        ui_child_layout_axis(UI_AXIS_Y)
+      ui_corner_radius(0)
+      ui_child_layout_axis(UI_AXIS_Y)
 
-        inner_box = ui_make_box_from_str(
-            UI_BOX_FLAG_DRAW_BACKGROUND |
-            UI_BOX_FLAG_DRAW_BORDER |
-            0,
-            str8_cat(ui_state->build_arena, title, str8_lit("##dummy_key1239782y3"))
-            );
+      inner_box = ui_make_transient_box(0);
 
       ui_spacer(ui_pixels(2.0f, 1.0f));
 
@@ -481,11 +568,11 @@ func void end_draggable_window(void) {
 
 func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height) {
   UI_box_flags flags =
-    UI_BOX_FLAG_FLOATING |
-    UI_BOX_FLAG_DRAW_BACKGROUND |
-    //UI_BOX_FLAG_CLIP |
-    //UI_BOX_FLAG_DROP_SITE |
-    0;
+  UI_BOX_FLAG_FLOATING |
+  UI_BOX_FLAG_DRAW_BACKGROUND |
+  //UI_BOX_FLAG_CLIP |
+  //UI_BOX_FLAG_DROP_SITE |
+  0;
 
   f32 padding = 6.0f;
 
@@ -497,12 +584,12 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
   UI_size sum = { .kind = UI_SIZE_CHILDREN_SUM, .value = 0.0f, .strictness = 0.0f, };
 
   ui_flags(flags)
-    ui_exclude_flags(UI_BOX_FLAG_OVERFLOW)
-    ui_child_layout_axis(UI_AXIS_Y)
-    ui_semantic_width(main_width) ui_semantic_height(main_height)
-    ui_fixed_position(list->pos)
+  ui_exclude_flags(UI_BOX_FLAG_OVERFLOW)
+  ui_child_layout_axis(UI_AXIS_Y)
+  ui_semantic_width(main_width) ui_semantic_height(main_height)
+  ui_fixed_position(list->pos)
 
-    main_box = ui_make_box_from_key(flags, ui_key_nil());
+  main_box = ui_make_box_from_key(flags, ui_key_nil());
 
   ui_parent(main_box)
   {
@@ -510,27 +597,27 @@ func UI_signal item_list_window(Game *gp, Item_list *list, f32 width, f32 height
 
     UI_box *box;
     ui_semantic_size(fit)
-      box = ui_make_box_from_key(0, ui_key_nil());
+    box = ui_make_box_from_key(0, ui_key_nil());
 
     ui_child_layout_axis(UI_AXIS_X)
-      ui_parent(box)
-      {
-        ui_spacer(ui_pixels(padding, 1.0f));
+    ui_parent(box)
+    {
+      ui_spacer(ui_pixels(padding, 1.0f));
 
-        ui_child_layout_axis(UI_AXIS_Y)
-          ui_semantic_height(sum)
-          ui_semantic_width(fit)
-          inner_container_box =
-          ui_make_box_from_str(
-              UI_BOX_FLAG_INVERT_SCROLL |
-              UI_BOX_FLAG_CLAMP_VIEW |
-              UI_BOX_FLAG_VIEW_SCROLL |
-              UI_BOX_FLAG_CLIP |
-              0,
-              list->id);
+      ui_child_layout_axis(UI_AXIS_Y)
+      ui_semantic_height(sum)
+      ui_semantic_width(fit)
+      inner_container_box =
+      ui_make_box_from_str(
+        UI_BOX_FLAG_INVERT_SCROLL |
+        UI_BOX_FLAG_CLAMP_VIEW |
+        UI_BOX_FLAG_VIEW_SCROLL |
+        UI_BOX_FLAG_CLIP |
+        0,
+        list->id);
 
-        ui_spacer(ui_pixels(padding, 1.0f));
-      }
+      ui_spacer(ui_pixels(padding, 1.0f));
+    }
 
     ui_spacer(ui_pixels(padding, 1.0f));
   }
@@ -546,16 +633,30 @@ func void test_ui(Game *gp) {
 
   ui_build() {
 
-#if 1
+    #if 1
     {
-      ui_font_size(20) ui_font_spacing(2)
-        ui_border_color(LIGHTGRAY) ui_background_color(BROWN) ui_text_color(WHITE)
-        begin_draggable_window(500, 100, 500, 500, str8_lit("Test Window##12319283"));
+
+      UI_signal window_signal = {0};
+
+      ui_font_size(20)
+      ui_font_spacing(2)
+      ui_border_color(LIGHTGRAY)
+      ui_background_color(BROWN)
+      ui_text_color(WHITE)
+      window_signal = begin_draggable_window(draggable_window_pos.x, draggable_window_pos.y, 500, 450, str8_lit("Test Window##12319283"));
+
+      if(window_signal.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
+        save_draggable_window_pos = draggable_window_pos;
+      }
+
+      if(window_signal.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
+        draggable_window_pos = Vector2Add(save_draggable_window_pos, ui_drag_delta());
+      }
 
       UI_size width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0, .strictness = 0 };
       UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
-#if 1
+      #if 1
       for(int i = 0; i < 3; i++) {
 
         // TODO
@@ -568,33 +669,33 @@ func void test_ui(Game *gp) {
         UI_signal sig = {0};
 
         ui_background_color(ColorBrightness(BROWN, -0.3f)) ui_text_color(WHITE)
-          ui_semantic_width(width) ui_semantic_height(height)
-          ui_border_size(2.0f)
-          ui_corner_radius(0.2f)
-          sig = ui_button(str8f(gp->frame_arena, "Button %i", i));
+        ui_semantic_width(width) ui_semantic_height(height)
+        ui_border_size(2.0f)
+        ui_corner_radius(0.2f)
+        sig = ui_button(str8f(gp->frame_arena, "Button %i", i));
 
         if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_CLICK) {
           printf("Button %i was clicked\n", i);
         }
       }
-#endif
+      #endif
 
       ui_border_color(LIGHTGRAY) ui_border_size(1.0f)
       {
         ui_divider(ui_pixels(30, 0));
       }
 
-      ui_inset_begin(ui_pixels(10, 1), ui_pixels(10, 1), ui_pixels(0, 1), ui_pixels(20, 1));
+      ui_inset_begin(ui_pixels(10, 1), ui_pixels(10, 1), ui_pixels(10, 1), ui_pixels(10, 1));
 
       ui_background_color(ColorBrightness(GREEN, -0.3f)) ui_text_color(WHITE)
-        ui_semantic_width(width) ui_semantic_height(height)
-        ui_border_size(2.0f)
-        ui_corner_radius(0.2f)
-        ui_padding(4)
-        ui_text_align(UI_TEXT_ALIGN_CENTER)
-        ui_font_size(20)
+      ui_semantic_width(width) ui_semantic_height(height)
+      ui_border_size(2.0f)
+      ui_corner_radius(0.2f)
+      ui_padding(4)
+      ui_text_align(UI_TEXT_ALIGN_CENTER)
+      ui_font_size(20)
 
-        ui_button(str8f(gp->frame_arena, "Extra Button"));
+      ui_button(str8f(gp->frame_arena, "Extra Button"));
 
       ui_spacer(ui_pixels(30, 1));
 
@@ -644,59 +745,59 @@ func void test_ui(Game *gp) {
 
       end_draggable_window();
     }
-#endif
+    #endif
 
-#if 0
+    #if 0
     ui_semantic_height(((UI_size){ .kind = UI_SIZE_PIXELS, .value = 80, .strictness = 1.0f }))
-      ui_semantic_width(((UI_size){ .kind = UI_SIZE_PIXELS, .value = 200, .strictness = 1.0f }))
-      ui_background_color(RED)
+    ui_semantic_width(((UI_size){ .kind = UI_SIZE_PIXELS, .value = 200, .strictness = 1.0f }))
+    ui_background_color(RED)
+    {
+
+      UI_box *container = ui_make_box_from_str(ui, UI_BOX_FLAG_DRAW_BACKGROUND, str8_lit("##container"));
+      ui_parent(container)
       {
-
-        UI_box *container = ui_make_box_from_str(ui, UI_BOX_FLAG_DRAW_BACKGROUND, str8_lit("##container"));
-        ui_parent(container)
-        {
-          ui_spacer(ui, ui_pixels(10, 1));
-          ui_background_color(YELLOW)
-          ui_semantic_size(((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, }))
-            ui_make_box_from_str(ui, UI_BOX_FLAG_DRAW_BACKGROUND, str8_lit("##child"));
-          ui_spacer(ui, ui_pixels(10, 1));
-        }
-
+        ui_spacer(ui, ui_pixels(10, 1));
+        ui_background_color(YELLOW)
+        ui_semantic_size(((UI_size){ .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, }))
+        ui_make_box_from_str(ui, UI_BOX_FLAG_DRAW_BACKGROUND, str8_lit("##child"));
+        ui_spacer(ui, ui_pixels(10, 1));
       }
-#endif
 
-#if 1
+    }
+    #endif
+
+    #if 1
     Color background_color = { 83, 82, 99, 255 };
     Color border_color = { 53, 52, 69, 255 };
     Color text_color = ColorBrightness(RAYWHITE, 0.7f);
 
     Color window_background_color = ColorBrightness(BLUE, -0.4f);
 
-#if 1
+    #if 1
     ui_background_color(background_color) ui_text_color(text_color) ui_border_color(border_color)
-      ui_padding(6.0f)
-      ui_border_size(4.0f) ui_corner_radius(0.5f)
-      ui_flags(UI_BOX_FLAG_FLOATING)
-      ui_fixed_position(((Vector2){ 200, 200 }))
-      ui_font_size(30.0f) ui_font_spacing(3.0f)
-      ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 1.0f, .strictness = 1.0f }))
-      ui_button(str8_lit("test button"));
-#endif
+    ui_padding(6.0f)
+    ui_border_size(4.0f) ui_corner_radius(0.5f)
+    ui_flags(UI_BOX_FLAG_FLOATING)
+    ui_fixed_position(((Vector2){ 200, 200 }))
+    ui_font_size(30.0f) ui_font_spacing(3.0f)
+    ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 1.0f, .strictness = 1.0f }))
+    ui_button(str8_lit("test button"));
+    #endif
 
-#endif
+    #endif
 
-#if 1
+    #if 1
 
     if(gp->dragging_item) {
       ui_permission_flags_top() |=
-        UI_PERMISSION_FLAG_CLICKS_RIGHT |
-        UI_PERMISSION_FLAG_CLICKS_MIDDLE |
-        0;
+      UI_PERMISSION_FLAG_CLICKS_RIGHT |
+      UI_PERMISSION_FLAG_CLICKS_MIDDLE |
+      0;
     } else {
       ui_permission_flags_top() &=
-        ~UI_PERMISSION_FLAG_CLICKS_RIGHT &
-        ~UI_PERMISSION_FLAG_CLICKS_MIDDLE &
-        1;
+      ~UI_PERMISSION_FLAG_CLICKS_RIGHT &
+      ~UI_PERMISSION_FLAG_CLICKS_MIDDLE &
+      1;
     }
 
 
@@ -720,8 +821,8 @@ func void test_ui(Game *gp) {
       UI_signal window_sig;
 
       ui_background_color(window_background_color)
-        //ui_exclude_flags(UI_BOX_FLAG_FLOATING)
-        window_sig = item_list_window(gp, list, 250, 200);
+      //ui_exclude_flags(UI_BOX_FLAG_FLOATING)
+      window_sig = item_list_window(gp, list, 250, 200);
 
       UI_box *window_box = window_sig.box;
 
@@ -743,10 +844,10 @@ func void test_ui(Game *gp) {
               UI_size height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 1.0 };
 
               ui_semantic_width(width) ui_semantic_height(height)
-                ui_flags(UI_BOX_FLAG_DROP_SITE)
-                ui_border_size(2.0f)
-                ui_corner_radius(0.2f)
-                item_sig = item_button(gp, item);
+              ui_flags(UI_BOX_FLAG_DROP_SITE)
+              ui_border_size(2.0f)
+              ui_corner_radius(0.2f)
+              item_sig = item_button(gp, item);
 
               if(next) {
                 ui_spacer(ui_pixels(6, 1));
@@ -767,7 +868,7 @@ func void test_ui(Game *gp) {
 
     }
 
-#if 0
+    #if 0
     Vector2 window_pos1 =
     {
       .x = 20,
@@ -776,32 +877,32 @@ func void test_ui(Game *gp) {
 
 
     ui_flags(UI_BOX_FLAG_FLOATING) ui_fixed_position(window_pos1)
-      ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
-      ui_child_layout_axis(UI_AXIS_Y)
+    ui_semantic_size(((UI_size){.kind = UI_SIZE_CHILDREN_SUM}))
+    ui_child_layout_axis(UI_AXIS_Y)
+    {
+      UI_box *container1 = ui_make_box_from_str(ui, 0, str8_lit("##container1"));
+
+      ui_parent(container1)
+      ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
+      ui_exclude_flags(UI_BOX_FLAG_FLOATING)
+      ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
+      ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 }))
+      ui_text_align((UI_text_align){ UI_TEXT_ALIGN_CENTER })
+      ui_padding(4.0f)
+      ui_font_size(20)
+      ui_font_spacing(2.0f)
+      ui_border_size(1.0f)
       {
-        UI_box *container1 = ui_make_box_from_str(ui, 0, str8_lit("##container1"));
-
-        ui_parent(container1)
-          ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT)
-          ui_exclude_flags(UI_BOX_FLAG_FLOATING)
-          ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
-          ui_semantic_size(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0, .strictness = 0 }))
-          ui_text_align((UI_text_align){ UI_TEXT_ALIGN_CENTER })
-          ui_padding(4.0f)
-          ui_font_size(20)
-          ui_font_spacing(2.0f)
-          ui_border_size(1.0f)
-          {
-            ui_make_box_from_str(ui, 0, str8_lit("hello world##0_0"));
-            ui_make_box_from_str(ui, 0, str8_lit("my##0_1"));
-            ui_make_box_from_str(ui, 0, str8_lit("name##0_2"));
-            ui_make_box_from_str(ui, 0, str8_lit("is##0_3"));
-            ui_make_box_from_str(ui, 0, str8_lit("joao##0_4"));
-
-          }
+        ui_make_box_from_str(ui, 0, str8_lit("hello world##0_0"));
+        ui_make_box_from_str(ui, 0, str8_lit("my##0_1"));
+        ui_make_box_from_str(ui, 0, str8_lit("name##0_2"));
+        ui_make_box_from_str(ui, 0, str8_lit("is##0_3"));
+        ui_make_box_from_str(ui, 0, str8_lit("joao##0_4"));
 
       }
-#endif
+
+    }
+    #endif
 
     if(gp->dragging_item) {
 
@@ -829,12 +930,12 @@ func void test_ui(Game *gp) {
         for(int list_i = 0; list_i < ARRLEN(gp->item_lists); list_i++) {
           Item_list *list = &gp->item_lists[list_i];
 
-#if 0
-           if(ui_key_match(list->sig.box->key, ui_drop_hot_box_key(ui))) {
-             Item_node *dropped_item = gp->dragging_item;
-             dll_push_back(list->first, list->last, dropped_item);
-           }
-#else
+          #if 0
+          if(ui_key_match(list->sig.box->key, ui_drop_hot_box_key(ui))) {
+            Item_node *dropped_item = gp->dragging_item;
+            dll_push_back(list->first, list->last, dropped_item);
+          }
+          #else
           for(Item_node *node = list->first; node; node = node->next) {
 
             if(ui_key_match(ui_key_from_str(node->text), ui_drop_hot_box_key())) {
@@ -853,7 +954,7 @@ func void test_ui(Game *gp) {
             }
 
           }
-#endif
+          #endif
         }
         gp->dragging_item = 0;
       }
@@ -861,67 +962,67 @@ func void test_ui(Game *gp) {
     }
 
     //ui->permission_flags = 0;
-#endif
+    #endif
 
-#if 0
-#if 1
+    #if 1
+    #if 1
     ui_child_layout_axis(1)
-      ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 360, }))
-      ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250,  }))
-      ui_border_color(RED) ui_border_size(2.0f)
-      ui_flags(UI_BOX_FLAG_FLOATING | 0) ui_fixed_position(window_pos2)
+    ui_semantic_width(((UI_size){.kind = UI_SIZE_PIXELS, .value = 360, }))
+    ui_semantic_height(((UI_size){.kind = UI_SIZE_PIXELS, .value = 250,  }))
+    ui_border_color(RED) ui_border_size(2.0f)
+    ui_flags(UI_BOX_FLAG_FLOATING | 0) ui_fixed_position(window_pos2)
+    {
+      UI_box *container2 = ui_make_box_from_str(0, str8_lit("##container2"));
+
+      UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.0, };
+      //UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
+      UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f};
+      ui_parent(container2)
+      ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT|UI_BOX_FLAG_SCROLL)
+      ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
+      ui_semantic_width(child_width) ui_semantic_height(child_height)
+      ui_text_align(UI_TEXT_ALIGN_CENTER)
+      ui_corner_radius(0.5f)
+      //ui_corner_radius_0(0.8f)
+      //ui_corner_radius_3(0.8f)
+      //ui_corner_radius_2(0.8f)
+      ui_padding(4.0f)
+      ui_font_size(20)
+      ui_font_spacing(2.0f)
+      ui_border_size(2.0f)
       {
-        UI_box *container2 = ui_make_box_from_str(ui, 0, str8_lit("##container2"));
+        f32 spacing = 8;
+        ui_semantic_height(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f }))
+        ui_background_color(BLUE) ui_text_color(GOLD) ui_text_align(UI_TEXT_ALIGN_LEFT)
+        {
+          UI_signal sig = ui_button(str8_lit("Drag Me!##drag_bar"));
 
-        UI_size child_width = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 1.0f, .strictness = 0.0, };
-        //UI_size child_height = { .kind = UI_SIZE_PERCENT_OF_PARENT, .value = 0.23f, .strictness = 0.7, };
-        UI_size child_height = { .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f};
-        ui_parent(container2)
-          ui_flags(UI_BOX_FLAG_DRAW_BACKGROUND|UI_BOX_FLAG_DRAW_BORDER|UI_BOX_FLAG_DRAW_TEXT|UI_BOX_FLAG_SCROLL)
-          ui_background_color(background_color) ui_border_color(border_color) ui_text_color(text_color)
-          ui_semantic_width(child_width) ui_semantic_height(child_height)
-          ui_text_align(UI_TEXT_ALIGN_CENTER)
-          ui_corner_radius(0.5f)
-          //ui_corner_radius_0(0.8f)
-          //ui_corner_radius_3(0.8f)
-          //ui_corner_radius_2(0.8f)
-          ui_padding(4.0f)
-          ui_font_size(20)
-          ui_font_spacing(2.0f)
-          ui_border_size(2.0f)
-          {
-            f32 spacing = 8;
-            ui_semantic_height(((UI_size){ .kind = UI_SIZE_TEXT_CONTENT, .value = 4.0f, .strictness = 1.0f }))
-              ui_background_color(BLUE) ui_text_color(GOLD) ui_text_align(UI_TEXT_ALIGN_LEFT)
-              {
-                UI_signal sig = ui_button_2(ui, str8_lit("Drag Me!##drag_bar"));
-
-                if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
-                  save_window_pos2 = window_pos2;
-                }
-
-                if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
-                  window_pos2 = Vector2Add(save_window_pos2, ui_drag_delta(ui));
-                }
-
-              }
-            ui_spacer(ui, ui_pixels(spacing, 1));
-
-            ui_button_2(ui, str8_lit("hello world##1_0"));
-            ui_spacer(ui, ui_pixels(spacing, 1));
-            ui_button(ui, str8_lit("my##1_1"));
-            ui_spacer(ui, ui_pixels(spacing, 1));
-            ui_button(ui, str8_lit("name##1_29123891"));
-            ui_spacer(ui, ui_pixels(spacing, 1));
-            ui_button(ui, str8_lit("is##1_3"));
-            ui_spacer(ui, ui_pixels(spacing, 1));
-            ui_button(ui, str8_lit("joao##1_4"));
-
+          if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_PRESS) {
+            save_window_pos2 = window_pos2;
           }
 
+          if(sig.flags & UI_SIGNAL_FLAG_LEFT_MOUSE_DRAG) {
+            window_pos2 = Vector2Add(save_window_pos2, ui_drag_delta());
+          }
+
+        }
+        ui_spacer(ui_pixels(spacing, 1));
+
+        ui_button(str8_lit("hello world##1_0"));
+        ui_spacer(ui_pixels(spacing, 1));
+        ui_button(str8_lit("my##1_1"));
+        ui_spacer(ui_pixels(spacing, 1));
+        ui_button(str8_lit("name##1_29123891"));
+        ui_spacer(ui_pixels(spacing, 1));
+        ui_button(str8_lit("is##1_3"));
+        ui_spacer(ui_pixels(spacing, 1));
+        ui_button(str8_lit("joao##1_4"));
+
       }
-#endif
-#endif
+
+    }
+    #endif
+    #endif
 
   }
 

@@ -233,7 +233,7 @@ func UI_box* ui_pane_begin(f32 x, f32 y, f32 w, f32 h, Str8 str) {
 func UI_box* ui_pane_beginf(f32 x, f32 y, f32 w, f32 h, char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  Str8 str = str8fv(ui_state->temp, fmt, args);
+  Str8 str = str8fv(ui_state->build_arena, fmt, args);
   va_end(args);
 
   UI_box *box = ui_pane_begin(x, y, w, h, str);

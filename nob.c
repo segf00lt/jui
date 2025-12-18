@@ -97,7 +97,7 @@ char vim_project_file[] =
 "let project_exe = '/"EXE"'\n"
 "let project_run = project_root . project_exe\n"
 "let project_debug = 'open -a Visual\\ Studio\\ Code ' . project_root\n"
-"\n" 
+"\n"
 "let &makeprg = project_build\n"
 "\n"
 "nnoremap <F7> :call jobstart('open -a Terminal ' . project_root, { 'detach':v:true })<CR>\n"
@@ -339,7 +339,7 @@ Arena *main_arena;
 Arena *temp_arena;
 
 
-/* * * * * * * * * * * * * * * * * 
+/* * * * * * * * * * * * * * * * *
  * function headers
  */
 
@@ -614,7 +614,7 @@ int build_hot_reload(void) {
 
   nob_log(NOB_INFO, "building in hot reload mode");
 
-  nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", SHARED, "module.c", "-I./third_party/raylib/", /*INCLUDE_AND_LINK_OPTIONS,*/ "-o", GAME_MODULE, "-lm");
+  nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", SHARED, "module.c", "-I./third_party/raylib/", INCLUDE_AND_LINK_OPTIONS, "-o", GAME_MODULE, "-lm");
   Nob_Proc p1 = nob_cmd_run_async_and_reset(&cmd);
 
   nob_cmd_append(&cmd, CC, DEV_FLAGS, "-fPIC", "-DGAME_MODULE_PATH=\""GAME_MODULE_PATH"\"", "cradle.c", INCLUDE_AND_LINK_OPTIONS, "-o", EXE, "-lm");
@@ -798,19 +798,19 @@ int main(int argc, char **argv) {
 
   NOB_GO_REBUILD_URSELF(argc, argv);
 
-  //if(!build_raylib()) return 1;
-  //if(!build_metaprogram()) return 1;
+  // if(!build_raylib()) return 1;
+  // if(!build_metaprogram()) return 1;
 
   //run_metaprogram();
   run_tags();
 
-  //if(!build_meta()) return 1;
-  //if(!build_release()) return 1;
-  //if(!build_wasm()) return 1;
-  //if(!build_itch()) return 1;
-  if(!build_hot_reload_no_cradle()) return 1;
-  //if(!build_hot_reload()) return 1;
-  //if(!build_hot_reload_cradle()) return 1;
+  // if(!build_meta()) return 1;
+  // if(!build_release()) return 1;
+  // if(!build_wasm()) return 1;
+  // if(!build_itch()) return 1;
+  // if(!build_hot_reload_no_cradle()) return 1;
+  if(!build_hot_reload()) return 1;
+  // if(!build_hot_reload_cradle()) return 1;
 
 #if 1
   {

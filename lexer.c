@@ -53,9 +53,9 @@ func Ctoken_slice lex_ctoken_old(Arena *arena, Str8 src) {
       s64 comment_end_col;
       if(new_lines.count > 0) {
         s64 last_new_line_pos = new_lines.end_indexes[new_lines.count-1];
-        comment_end_col = cur_col + last_new_line_pos; 
+        comment_end_col = cur_col + last_new_line_pos;
       } else {
-        comment_end_col = cur_col + comment_str.len; 
+        comment_end_col = cur_col + comment_str.len;
       }
 
       Ctoken token =
@@ -317,9 +317,9 @@ begin:
       s64 comment_end_col;
       if(new_lines.count > 0) {
         s64 last_new_line_pos = new_lines.end_indexes[new_lines.count-1];
-        comment_end_col = lexer->cur_col + last_new_line_pos; 
+        comment_end_col = lexer->cur_col + last_new_line_pos;
       } else {
-        comment_end_col = lexer->cur_col + comment_str.len; 
+        comment_end_col = lexer->cur_col + comment_str.len;
       }
 
       if(lexer->flags & CLEXER_FLAG_SKIP_MULTI_LINE_COMMENTS) {
@@ -423,13 +423,13 @@ begin:
       Cliteral literal;
       literal.integer = str8_parse_int_decimal(lit_str);
       token =
-        (Ctoken) {
-          .kind = CTOKEN_INT_LITERAL,
-          .str = lit_str,
-          .line = lexer->cur_line,
-          .col = lexer->cur_col,
-          .literal = literal,
-        };
+      (Ctoken) {
+        .kind = CTOKEN_INT_LITERAL,
+        .str = lit_str,
+        .line = lexer->cur_line,
+        .col = lexer->cur_col,
+        .literal = literal,
+      };
       lexer->cur_col += lit_str.len;
       lexer->pos += lit_str.len;
       goto end;

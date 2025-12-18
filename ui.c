@@ -28,7 +28,7 @@ f32 ui_prof_time_to_calc_positions;
  */
 
 func UI_state* ui_state_alloc(void) {
-  
+
   Arena *arena = arena_alloc(MB(1));
   UI_state *ui = push_struct(arena, UI_state);
 
@@ -379,7 +379,7 @@ func UI_signal ui_signal_from_box(UI_box *box) {
       sig.flags |= UI_SIGNAL_FLAG_MOUSE_HOVERING | UI_SIGNAL_FLAG_MOUSE_OVER;
     }
   }
-  
+
   if(box->flags & UI_BOX_FLAG_DROP_SITE &&
       mouse_in_bounds &&
       (ui_key_match(ui_state->drop_hot_box_key, ui_key_nil()) || ui_key_match(ui_state->drop_hot_box_key, box->key)))
@@ -397,8 +397,8 @@ func UI_signal ui_signal_from_box(UI_box *box) {
 
   { /* scrolling */
     s16 delta[2] = {
-      (event->scroll_delta.x > 0) ? 1 : ((event->scroll_delta.x < 0) ? -1 : 0), 
-      (event->scroll_delta.y > 0) ? 1 : ((event->scroll_delta.y < 0) ? -1 : 0), 
+      (event->scroll_delta.x > 0) ? 1 : ((event->scroll_delta.x < 0) ? -1 : 0),
+      (event->scroll_delta.y > 0) ? 1 : ((event->scroll_delta.y < 0) ? -1 : 0),
     };
 
     if(event->modifier_keys & UI_MOD_MASK_SHIFT) {
@@ -873,7 +873,7 @@ func void ui_end_build(void) {
             }
 
             f32 violation = total_size - total_allowed_size;
-            
+
             if(violation > 0 && total_weighted_size > 0) arena_scope(ui_state->build_arena)
             {
               f32 *child_fixups = push_array(ui_state->build_arena, f32, node->child_count);
@@ -1086,12 +1086,12 @@ func void dump_UI_box(const UI_box *box) {
 int dumped = 0;
 
 func void ui_draw(void) {
-  
+
 #ifdef UI_DRAW_DUMP
   if(dumped > 0) {
     printf("====== BEGIN DRAW DUMP ======\n");
   }
-  
+
   int depth = 0;
 #endif
 
@@ -1119,7 +1119,7 @@ func void ui_draw(void) {
           box->corner_radius[1],
           box->corner_radius[2],
           box->corner_radius[3],
-          8,
+          16,
           box->background_color);
     }
 
@@ -1129,7 +1129,7 @@ func void ui_draw(void) {
           box->corner_radius[1],
           box->corner_radius[2],
           box->corner_radius[3],
-          8,
+          16,
           box->border_size,
           box->border_color);
     }
@@ -1233,7 +1233,7 @@ func void ui_draw(void) {
 
       SetTextLineSpacing(1);
       {
-        Str8 dump = 
+        Str8 dump =
             str8f(ui_state->temp,
               "%*sx = %f    y = %f\n\n"
               "%*swidth = %f    height = %f\n\n"
@@ -1264,7 +1264,7 @@ func void ui_draw(void) {
       }
 
       SetTextLineSpacing(5);
-      //DrawRectangleLinesEx(rec, 1.0, RED);
+      DrawRectangleLinesEx(rec, 1.0, RED);
 
     }
 #endif

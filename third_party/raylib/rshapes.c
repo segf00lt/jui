@@ -1121,25 +1121,31 @@ void DrawRectangleRoundedPro(Rectangle rec, float r0, float r1, float r2, float 
         return;
     }
 
-    if (r0 >= 1.0f) r0 = 1.0f;
-    if (r1 >= 1.0f) r1 = 1.0f;
-    if (r2 >= 1.0f) r2 = 1.0f;
-    if (r3 >= 1.0f) r3 = 1.0f;
+    // if (r0 >= 1.0f) r0 = 1.0f;
+    // if (r1 >= 1.0f) r1 = 1.0f;
+    // if (r2 >= 1.0f) r2 = 1.0f;
+    // if (r3 >= 1.0f) r3 = 1.0f;
 
     // Calculate corner radius
     float radius[4] = {0};
 
-    radius[0] = (rec.width > rec.height)? (rec.height*r0)/2 : (rec.width*r0)/2;
-    if (radius[0] <= 0.0f) radius[0] = 0;
+    // NOTE(~jfd 26/09/25) make these functions draw with absolute radii
+    radius[0] = r0;
+    radius[1] = r1;
+    radius[2] = r2;
+    radius[3] = r3;
 
-    radius[1] = (rec.width > rec.height)? (rec.height*r1)/2 : (rec.width*r1)/2;
-    if (radius[1] <= 0.0f) radius[1] = 0;
+    // radius[0] = (rec.width > rec.height)? (rec.height*r0)/2 : (rec.width*r0)/2;
+    // if (radius[0] <= 0.0f) radius[0] = 0;
 
-    radius[2] = (rec.width > rec.height)? (rec.height*r2)/2 : (rec.width*r2)/2;
-    if (radius[2] <= 0.0f) radius[2] = 0;
+    // radius[1] = (rec.width > rec.height)? (rec.height*r1)/2 : (rec.width*r1)/2;
+    // if (radius[1] <= 0.0f) radius[1] = 0;
 
-    radius[3] = (rec.width > rec.height)? (rec.height*r3)/2 : (rec.width*r3)/2;
-    if (radius[3] <= 0.0f) radius[3] = 0;
+    // radius[2] = (rec.width > rec.height)? (rec.height*r2)/2 : (rec.width*r2)/2;
+    // if (radius[2] <= 0.0f) radius[2] = 0;
+
+    // radius[3] = (rec.width > rec.height)? (rec.height*r3)/2 : (rec.width*r3)/2;
+    // if (radius[3] <= 0.0f) radius[3] = 0;
 
     // Calculate number of segments to use for the corners
     if (segments < 4) {
@@ -1613,25 +1619,31 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
         return;
     }
 
-    if (r0 >= 1.0f) r0 = 1.0f;
-    if (r1 >= 1.0f) r1 = 1.0f;
-    if (r2 >= 1.0f) r2 = 1.0f;
-    if (r3 >= 1.0f) r3 = 1.0f;
+    // if (r0 >= 1.0f) r0 = 1.0f;
+    // if (r1 >= 1.0f) r1 = 1.0f;
+    // if (r2 >= 1.0f) r2 = 1.0f;
+    // if (r3 >= 1.0f) r3 = 1.0f;
 
     // Calculate corner radius
     float radius[4] = {0};
 
-    radius[0] = (rec.width > rec.height)? (rec.height*r0)/2 : (rec.width*r0)/2;
-    if (radius[0] <= 0.0f) radius[0] = 0;
+    // NOTE(~jfd 26/09/25) make these functions draw with absolute radii
+    radius[0] = r0;
+    radius[1] = r1;
+    radius[2] = r2;
+    radius[3] = r3;
 
-    radius[1] = (rec.width > rec.height)? (rec.height*r1)/2 : (rec.width*r1)/2;
-    if (radius[1] <= 0.0f) radius[1] = 0;
+    // radius[0] = (rec.width > rec.height)? (rec.height*r0)/2 : (rec.width*r0)/2;
+    // if (radius[0] <= 0.0f) radius[0] = 0;
 
-    radius[2] = (rec.width > rec.height)? (rec.height*r2)/2 : (rec.width*r2)/2;
-    if (radius[2] <= 0.0f) radius[2] = 0;
+    // radius[1] = (rec.width > rec.height)? (rec.height*r1)/2 : (rec.width*r1)/2;
+    // if (radius[1] <= 0.0f) radius[1] = 0;
 
-    radius[3] = (rec.width > rec.height)? (rec.height*r3)/2 : (rec.width*r3)/2;
-    if (radius[3] <= 0.0f) radius[3] = 0;
+    // radius[2] = (rec.width > rec.height)? (rec.height*r2)/2 : (rec.width*r2)/2;
+    // if (radius[2] <= 0.0f) radius[2] = 0;
+
+    // radius[3] = (rec.width > rec.height)? (rec.height*r3)/2 : (rec.width*r3)/2;
+    // if (radius[3] <= 0.0f) radius[3] = 0;
 
 
     // Calculate number of segments to use for the corners
@@ -1666,7 +1678,7 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
           \\ P13              P12 //
            P5 ================== P4
     */
-    
+
     /* NOTE(~jfd 30/07/2025)
      *
      * Unlike DrawRectangleRoundedLinesEx() this function does not put the border lines centered on the rectangle
@@ -1676,21 +1688,37 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
      */
     Vector2 point[16] = {
         {(float)rec.x + innerRadius[0], rec.y - lineThick},
+
         {(float)(rec.x + rec.width) - innerRadius[1], rec.y - lineThick},
+
         {rec.x + rec.width + lineThick, (float)rec.y + innerRadius[1]}, // PO, P1, P2
+
         {rec.x + rec.width + lineThick, (float)(rec.y + rec.height) - innerRadius[2]},
+
         {(float)(rec.x + rec.width) - innerRadius[2], rec.y + rec.height + lineThick}, // P3, P4
+
         {(float)rec.x + innerRadius[3], rec.y + rec.height + lineThick},
+
         {rec.x - lineThick, (float)(rec.y + rec.height) - innerRadius[3]},
+
         {rec.x - lineThick, (float)rec.y + innerRadius[0]}, // P5, P6, P7
+
         {(float)rec.x + innerRadius[0], rec.y},
+
         {(float)(rec.x + rec.width) - innerRadius[1], rec.y}, // P8, P9
+
         {rec.x + rec.width, (float)rec.y + innerRadius[1]},
+
         {rec.x + rec.width, (float)(rec.y + rec.height) - innerRadius[2]}, // P10, P11
+
         {(float)(rec.x + rec.width) - innerRadius[2], rec.y + rec.height},
+
         {(float)rec.x + innerRadius[3], rec.y + rec.height}, // P12, P13
+
         {rec.x, (float)(rec.y + rec.height) - innerRadius[3]},
+
         {rec.x, (float)rec.y + innerRadius[0]} // P14, P15
+
     };
 
     const Vector2 centers[4] = {
@@ -1707,7 +1735,7 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
     // This might be causing a bit of squigglyness on the vertical sides of rounded rectangles
     if(radius[0] <= 0) {
       point[0].x = point[7].x;
-      point[8].x = point[7].x;
+      point[8].x = point[15].x;
 
       point[15].y = point[0].y;
       point[7].y  = point[0].y;
@@ -1715,24 +1743,24 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
 
     if(radius[1] <= 0) {
       point[1].x = point[2].x;
-      point[9].x = point[2].x;
-      
+      point[9].x = point[10].x;
+
       point[10].y = point[1].y;
       point[2].y = point[1].y;
     }
 
     if(radius[2] <= 0) {
-      point[3].x = point[4].y;
-      point[11].x = point[4].y;
-      
-      point[4].y = point[3].x;
-      point[12].y = point[3].x;
+      point[3].y = point[4].y;
+      point[11].y = point[4].y;
+
+      point[4].x = point[3].x;
+      point[12].x = point[3].x;
     }
 
     if(radius[3] <= 0) {
       point[5].x = point[6].x;
       point[13].x = point[6].x;
-      
+
       point[6].y = point[5].y;
       point[14].y = point[5].y;
     }
@@ -1748,28 +1776,29 @@ void DrawRectangleRoundedLinesPro(Rectangle rec, float r0, float r1, float r2, f
             // Draw all the 4 corners first: Upper Left Corner, Upper Right Corner, Lower Right Corner, Lower Left Corner
             for (int k = 0; k < 4; ++k) // Hope the compiler is smart enough to unroll this loop
             {
-              if(radius[k] > 0.0f) {
-                float angle = angles[k];
-                const Vector2 center = centers[k];
-                for (int i = 0; i < segments; i++)
-                {
-                    rlColor4ub(color.r, color.g, color.b, color.a);
 
-                    rlTexCoord2f(shapeRect.x/texShapes.width, shapeRect.y/texShapes.height);
-                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius[k], center.y + sinf(DEG2RAD*angle)*innerRadius[k]);
+                if(radius[k] > 0.0f) {
+                    float angle = angles[k];
+                    const Vector2 center = centers[k];
+                    for (int i = 0; i < segments; i++)
+                    {
+                        rlColor4ub(color.r, color.g, color.b, color.a);
 
-                    rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
-                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius[k], center.y + sinf(DEG2RAD*(angle + stepLength))*innerRadius[k]);
+                        rlTexCoord2f(shapeRect.x/texShapes.width, shapeRect.y/texShapes.height);
+                        rlVertex2f(center.x + cosf(DEG2RAD*angle)*innerRadius[k], center.y + sinf(DEG2RAD*angle)*innerRadius[k]);
 
-                    rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                    rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius[k], center.y + sinf(DEG2RAD*(angle + stepLength))*outerRadius[k]);
+                        rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, shapeRect.y/texShapes.height);
+                        rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*innerRadius[k], center.y + sinf(DEG2RAD*(angle + stepLength))*innerRadius[k]);
 
-                    rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
-                    rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius[k], center.y + sinf(DEG2RAD*angle)*outerRadius[k]);
+                        rlTexCoord2f((shapeRect.x + shapeRect.width)/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
+                        rlVertex2f(center.x + cosf(DEG2RAD*(angle + stepLength))*outerRadius[k], center.y + sinf(DEG2RAD*(angle + stepLength))*outerRadius[k]);
 
-                    angle += stepLength;
+                        rlTexCoord2f(shapeRect.x/texShapes.width, (shapeRect.y + shapeRect.height)/texShapes.height);
+                        rlVertex2f(center.x + cosf(DEG2RAD*angle)*outerRadius[k], center.y + sinf(DEG2RAD*angle)*outerRadius[k]);
+
+                        angle += stepLength;
+                    }
                 }
-              }
             }
 
             // Upper rectangle
